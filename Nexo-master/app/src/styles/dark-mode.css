@@ -1,0 +1,222 @@
+.dark {
+  --background: 226 39% 9%;
+  --foreground: 210 40% 98%;
+  --card: 224 34% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 224 34% 13%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 244 100% 70%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 30% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 220 30% 18%;
+  --muted-foreground: 215 18% 72%;
+  --accent: 220 30% 18%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 28% 22%;
+  --input: 220 28% 22%;
+  --ring: 244 100% 70%;
+  --sidebar-background: 224 34% 13%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 244 100% 70%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 30% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 220 28% 22%;
+  --sidebar-ring: 244 100% 70%;
+}
+
+.dark body {
+  background-color: hsl(226 39% 9%);
+  color: hsl(210 40% 98%);
+}
+
+.dark .nexo-app-bg {
+  background:
+    linear-gradient(135deg, rgba(13, 21, 38, 0.98) 0%, rgba(21, 20, 48, 0.98) 54%, rgba(16, 31, 42, 0.98) 100%),
+    repeating-linear-gradient(90deg, rgba(124, 109, 255, 0.05) 0 1px, transparent 1px 96px);
+}
+
+.dark .premium-shell,
+.dark .premium-card,
+.dark .glassmorphism {
+  background-color: hsl(224 34% 13% / 0.82) !important;
+  border-color: hsl(220 28% 24% / 0.9) !important;
+  box-shadow: 0 18px 45px hsl(226 39% 4% / 0.32) !important;
+}
+
+.dark .premium-card-hover:hover {
+  border-color: hsl(244 100% 72% / 0.32) !important;
+  box-shadow: 0 22px 55px hsl(226 39% 4% / 0.5) !important;
+}
+
+.dark .soft-panel,
+.dark .soft-input {
+  background-color: hsl(220 30% 18% / 0.78) !important;
+  border-color: hsl(220 28% 25% / 0.95) !important;
+}
+
+.dark .bg-white { background-color: hsl(224 34% 13%) !important; }
+.dark .bg-white\/45 { background-color: hsl(220 30% 18% / 0.45) !important; }
+.dark .bg-white\/55 { background-color: hsl(220 30% 18% / 0.55) !important; }
+.dark .bg-white\/65 { background-color: hsl(220 30% 18% / 0.65) !important; }
+.dark .bg-white\/70 { background-color: hsl(220 30% 18% / 0.7) !important; }
+.dark .bg-white\/75 { background-color: hsl(220 30% 18% / 0.75) !important; }
+.dark .bg-white\/80 { background-color: hsl(224 34% 13% / 0.8) !important; }
+.dark .bg-white\/85 { background-color: hsl(224 34% 13% / 0.85) !important; }
+.dark .bg-white\/90 { background-color: hsl(224 34% 13% / 0.9) !important; }
+.dark .bg-secondary-gray-50 { background-color: hsl(220 30% 16%) !important; }
+.dark .bg-secondary-gray-100 { background-color: hsl(226 39% 10%) !important; }
+
+.dark .hover\:bg-white\/80:hover { background-color: hsl(220 30% 18% / 0.95) !important; }
+.dark .hover\:bg-white\/75:hover { background-color: hsl(220 30% 20% / 0.95) !important; }
+.dark .hover\:bg-white\/70:hover { background-color: hsl(220 30% 20% / 0.95) !important; }
+.dark .hover\:bg-secondary-gray-50:hover { background-color: hsl(220 30% 20%) !important; }
+.dark .hover\:bg-secondary-gray-100:hover { background-color: hsl(220 30% 22%) !important; }
+.dark .hover\:bg-white:hover { background-color: hsl(220 30% 18%) !important; }
+
+.dark .text-navy-900 { color: hsl(210 40% 97%) !important; }
+.dark .text-navy-800 { color: hsl(210 40% 93%) !important; }
+.dark .text-navy-700 { color: hsl(210 32% 84%) !important; }
+.dark .chat-close-button { color: #ffffff !important; }
+.dark .text-secondary-gray-600 { color: hsl(215 18% 72%) !important; }
+.dark .text-secondary-gray-500 { color: hsl(215 18% 68%) !important; }
+.dark .text-secondary-gray-400 { color: hsl(215 16% 58%) !important; }
+.dark .text-secondary-gray-300 { color: hsl(215 14% 48%) !important; }
+
+.dark .border-secondary-gray-100,
+.dark .border-secondary-gray-200,
+.dark .border-white\/70,
+.dark .border-white\/75,
+.dark .border-white\/80 {
+  border-color: hsl(220 28% 24% / 0.9) !important;
+}
+
+.dark .shadow-card {
+  box-shadow: 0 18px 45px hsl(226 39% 4% / 0.32) !important;
+}
+
+.dark .shadow-card-hover {
+  box-shadow: 0 22px 55px hsl(226 39% 4% / 0.5) !important;
+}
+
+.dark .shadow-navbar {
+  box-shadow: 0 16px 45px hsl(226 39% 4% / 0.38) !important;
+}
+
+.dark .metric-light-card {
+  color: #0e1320 !important;
+}
+
+.dark .metric-light-card .text-navy-900 {
+  color: #0e1320 !important;
+}
+
+.dark .metric-light-card .text-navy-700 {
+  color: #263247 !important;
+}
+
+.dark .metric-light-card .metric-countdown-separator {
+  color: rgba(14, 19, 32, 0.75) !important;
+}
+
+.dark .metric-light-card .bg-white\/60 {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.dark .metric-light-card .text-green-700 {
+  color: #01b574 !important;
+}
+
+.dark .metric-light-card .text-red-700 {
+  color: #ef4444 !important;
+}
+
+.dark .dashboard-realtime-card:hover {
+  border-color: hsl(244 100% 72% / 0.2) !important;
+  box-shadow: 0 14px 34px hsl(226 39% 4% / 0.34) !important;
+}
+
+.dark .bg-primary\/10 { background-color: hsl(244 100% 70% / 0.16) !important; }
+.dark .bg-green-50 { background-color: hsl(160 70% 40% / 0.16) !important; }
+.dark .bg-orange-50 { background-color: hsl(35 95% 55% / 0.16) !important; }
+.dark .bg-red-50 { background-color: hsl(0 80% 60% / 0.16) !important; }
+.dark .bg-yellow-50 { background-color: hsl(48 90% 60% / 0.16) !important; }
+.dark .bg-blue-50 { background-color: hsl(217 91% 60% / 0.16) !important; }
+.dark .bg-violet-50 { background-color: hsl(262 83% 65% / 0.18) !important; }
+.dark .bg-emerald-50 { background-color: hsl(160 70% 44% / 0.16) !important; }
+
+.dark .text-green-600,
+.dark .text-green-700 { color: hsl(152 76% 66%) !important; }
+.dark .text-orange-600,
+.dark .text-orange-700 { color: hsl(35 95% 68%) !important; }
+.dark .text-red-600,
+.dark .text-red-700 { color: hsl(0 85% 73%) !important; }
+.dark .text-blue-600 { color: hsl(217 91% 72%) !important; }
+.dark .text-yellow-700 { color: hsl(48 90% 72%) !important; }
+
+.dark input,
+.dark textarea,
+.dark select {
+  color-scheme: dark;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(220 30% 16%) 25%,
+    hsl(220 30% 22%) 50%,
+    hsl(220 30% 16%) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+}
+
+.dark .light-scope {
+  background-color: #f5f7fb;
+  color: #0e1320;
+}
+
+.dark .light-scope .nexo-app-bg {
+  background:
+    linear-gradient(135deg, rgba(208, 235, 247, 0.9) 0%, rgba(244, 238, 255, 0.82) 48%, rgba(255, 249, 238, 0.9) 100%),
+    repeating-linear-gradient(90deg, rgba(91, 76, 255, 0.04) 0 1px, transparent 1px 96px);
+}
+
+.dark .light-scope .premium-shell,
+.dark .light-scope .premium-card,
+.dark .light-scope .glassmorphism {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.78) !important;
+  box-shadow: 0 18px 45px rgba(34, 42, 66, 0.06) !important;
+}
+
+.dark .light-scope .soft-panel,
+.dark .light-scope .soft-input {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.dark .light-scope .bg-white { background-color: #ffffff !important; }
+.dark .light-scope .bg-white\/45 { background-color: rgba(255, 255, 255, 0.45) !important; }
+.dark .light-scope .bg-white\/55 { background-color: rgba(255, 255, 255, 0.55) !important; }
+.dark .light-scope .bg-white\/65 { background-color: rgba(255, 255, 255, 0.65) !important; }
+.dark .light-scope .bg-white\/70 { background-color: rgba(255, 255, 255, 0.7) !important; }
+.dark .light-scope .bg-white\/75 { background-color: rgba(255, 255, 255, 0.75) !important; }
+.dark .light-scope .bg-white\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+.dark .light-scope .bg-white\/85 { background-color: rgba(255, 255, 255, 0.85) !important; }
+.dark .light-scope .bg-white\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+.dark .light-scope .bg-secondary-gray-50 { background-color: #fbfbfd !important; }
+.dark .light-scope .bg-secondary-gray-100 { background-color: #f5f7fb !important; }
+.dark .light-scope .text-navy-900 { color: #0e1320 !important; }
+.dark .light-scope .text-navy-800 { color: #172033 !important; }
+.dark .light-scope .text-navy-700 { color: #263247 !important; }
+.dark .light-scope .text-secondary-gray-600 { color: #525f70 !important; }
+.dark .light-scope .text-secondary-gray-500 { color: #697586 !important; }
+.dark .light-scope .text-secondary-gray-400 { color: #aeb8c8 !important; }
+.dark .light-scope input,
+.dark .light-scope textarea,
+.dark .light-scope select {
+  color-scheme: light;
+}

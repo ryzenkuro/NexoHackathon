@@ -1,0 +1,157 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from '@/components/ui/command';
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Shield,
+  Flame,
+  Bell,
+  Settings,
+  Moon,
+  Sun,
+  LogOut,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useAuthStore, useTrendStore } from '@/stores';
+import { clearStoredAuth, formatGrowth } from '@/lib/utils';
+import { toast } from 'sonner';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import type { Trend } from '@/types';
+
+interface CommandPaletteProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onOpenProduct: () => void;
+}
+
+/**
+ * Command palette (Cmd+K / Ctrl+K) untuk navigasi cepat dan pencarian tren.
+ * Trigger key listener-nya didaftarkan di `useCommandPaletteHotkey` hook.
+ */
+export default function CommandPalette({ open, onOpenChange, onOpenProduct }: CommandPaletteProps) {
+  const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === 'dark';
+  const { trends, setSelectedTrend } = useTrendStore();
+  const { setAuth } = useAuthStore();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const go = (path: string) => {
+    onOpenChange(false);
+    navigate(path);
+  };
+
+  const handleSelectTrend = (trend: Trend) => {
+    setSelectedTrend(trend);
+    onOpenChange(false);
+    onOpenProduct();
+  };
+
+  const handleLogout = () => {
+    clearStoredAuth();
+    setAuth(false, null);
+    toast.success('Logout berhasil. Sampai jumpa!');
+    navigate('/login');
+  };
+
+  const askLogout = () => {
+    // Tutup palette dulu supaya tidak overlap
+    onOpenChange(false);
+    setShowLogoutConfirm(true);
+  };
+
+  return (
+    <>
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Pencarian cepat"
+      description="Cari tren atau berpindah halaman dengan cepat"
+    >
+      <CommandInput placeholder="Cari tren atau halaman..." />
+      <CommandList>
+        <CommandEmpty>Hmm, tidak ketemu. Coba kata kunci lain.</CommandEmpty>
+
+        <CommandGroup heading="Halaman">
+          <CommandItem onSelect={() => go('/dashboard')}>
+            <LayoutDashboard />
+            <span>Dashboard</span>
+            <CommandShortcut>G D</CommandShortcut>
+          </CommandItem>
+          <CommandItem onSelect={() => go('/viral-products')}>
+            <TrendingUp />
+            <span>Produk Viral</span>
+          </CommandItem>
+          <CommandItem onSelect={() => go('/saturation-guard')}>
+            <Shield />
+            <span>Saturation Guard</span>
+          </CommandItem>
+          <CommandItem onSelect={() => go('/trending-content')}>
+            <Flame />
+            <span>Konten Trending</span>
+          </CommandItem>
+          <CommandItem onSelect={() => go('/notifications')}>
+            <Bell />
+            <span>Notifikasi</span>
+          </CommandItem>
+          <CommandItem onSelect={() => go('/settings')}>
+            <Settings />
+            <span>Pengaturan</span>
+          </CommandItem>
+        </CommandGroup>
+
+        {trends.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Tren Aktif">
+              {trends.slice(0, 8).map((trend) => (
+                <CommandItem
+                  key={trend.id}
+                  value={`${trend.name} ${trend.category} ${trend.platform}`}
+                  onSelect={() => handleSelectTrend(trend)}
+                >
+                  <TrendingUp />
+                  <span>{trend.name}</span>
+                  <CommandShortcut>{formatGrowth(trend.growth)}</CommandShortcut>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+
+        <CommandSeparator />
+        <CommandGroup heading="Aksi">
+          <CommandItem onSelect={() => { setTheme(isDark ? 'light' : 'dark'); onOpenChange(false); }}>
+            {isDark ? <Sun /> : <Moon />}
+            <span>{isDark ? 'Mode Terang' : 'Mode Gelap'}</span>
+          </CommandItem>
+          <CommandItem onSelect={askLogout}>
+            <LogOut />
+            <span>Keluar Akun</span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+    <ConfirmDialog
+      open={showLogoutConfirm}
+      onClose={() => setShowLogoutConfirm(false)}
+      onConfirm={handleLogout}
+      title="Keluar dari Nexo?"
+      description="Anda akan diarahkan ke halaman login. Data tren tetap tersimpan untuk login berikutnya."
+      confirmLabel="Ya, keluar"
+      cancelLabel="Batal"
+      variant="danger"
+    />
+    </>
+  );
+}

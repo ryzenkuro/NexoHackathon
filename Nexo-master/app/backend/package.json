@@ -1,0 +1,27 @@
+{
+  "name": "nexo-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "smoke:backend": "powershell -ExecutionPolicy Bypass -File src/scripts/smokeBackend.ps1",
+    "smoke:r2": "node src/scripts/testR2Upload.js",
+    "ingest:research": "node src/scripts/ingestResearchData.js",
+    "ingest:platform-keywords": "node src/scripts/ingestPlatformKeywords.js",
+    "ingest:videos": "node src/scripts/ingestTrendingVideos.js",
+    "repair:trend-thumbnails": "node src/scripts/repairTrendThumbnails.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1057.0",
+    "@azure/openai": "^2.0.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.3"
+  }
+}

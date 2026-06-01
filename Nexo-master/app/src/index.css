@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import './styles/animations.css';
+@import './styles/dark-mode.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 226 39% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 244 100% 65%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 47% 11%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 29% 96%;
+    --muted-foreground: 215 18% 42%;
+
+    --accent: 220 20% 97%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 244 100% 65%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 244 100% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 97%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 244 100% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-secondary-gray-100 text-navy-900 font-sans antialiased;
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: 0;
+  }
+
+  .dark body {
+    @apply text-foreground;
+    background-color: hsl(222 47% 11%);
+  }
+
+  /* Respect user motion preference — disable animations for users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .glassmorphism {
+    @apply backdrop-blur-2xl bg-white/80 border border-white/70;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Tailwind v4 compat: outline-hidden = visually hide outline but keep it
+     accessible to forced-colors mode. Used by shadcn/ui components copied
+     from a v4 source. Without this, browser default outline (black ring)
+     appears on focus. */
+  .outline-hidden {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .nexo-app-bg {
+    background:
+      linear-gradient(135deg, rgba(208, 235, 247, 0.9) 0%, rgba(244, 238, 255, 0.82) 48%, rgba(255, 249, 238, 0.9) 100%),
+      repeating-linear-gradient(90deg, rgba(91, 76, 255, 0.04) 0 1px, transparent 1px 96px);
+  }
+
+  .premium-shell {
+    @apply border border-white/75 bg-white/70 shadow-card backdrop-blur-2xl;
+  }
+
+  .premium-card {
+    @apply border border-white/80 bg-white/80 shadow-card backdrop-blur-xl transition-colors duration-200;
+  }
+
+  .premium-card-hover {
+    @apply hover:border-white hover:shadow-card-hover;
+  }
+
+  .soft-panel {
+    @apply border border-secondary-gray-200/80 bg-secondary-gray-50/80;
+  }
+
+  .soft-input {
+    @apply border border-white/80 bg-white/80 text-navy-900 placeholder:text-secondary-gray-500 shadow-xs outline-none transition-all duration-200 focus:border-primary/50 focus:ring-4 focus:ring-primary/10;
+  }
+
+  .icon-button {
+    @apply inline-flex items-center justify-center rounded-xl text-navy-700 transition-colors duration-200 hover:bg-white/80 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/15;
+  }
+
+  .section-heading {
+    @apply text-base font-bold text-navy-900;
+  }
+
+  .muted-copy {
+    @apply text-sm text-secondary-gray-500;
+  }
+
+  .metric-pastel-cream {
+    background: linear-gradient(145deg, #fff0d5 0%, #ffe7bd 100%);
+  }
+
+  .metric-pastel-blue {
+    background: linear-gradient(145deg, #dbeaff 0%, #c7ddff 100%);
+  }
+
+  .metric-pastel-lilac {
+    background: linear-gradient(145deg, #ebe8ff 0%, #ded9ff 100%);
+  }
+
+  .metric-pastel-mint {
+    background: linear-gradient(145deg, #dcfce7 0%, #c8f4d9 100%);
+  }
+}

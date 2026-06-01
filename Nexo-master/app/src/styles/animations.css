@@ -1,0 +1,422 @@
+/* ─── Page Transitions ─────────────────────────────────────────────────────── */
+.page-enter {
+  opacity: 0;
+}
+.page-enter-active {
+  opacity: 1;
+  transition: opacity 150ms ease-out;
+}
+.page-exit {
+  opacity: 1;
+}
+.page-exit-active {
+  opacity: 0;
+  transition: opacity 150ms ease-in;
+}
+
+/* ─── Fade In ──────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: fadeIn 150ms ease-out forwards;
+}
+
+/* ─── Fade In Up ───────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in-up {
+  animation: fadeInUp 400ms ease-out forwards;
+}
+
+.fade-in-up-1 { animation-delay: 0.1s; opacity: 0; }
+.fade-in-up-2 { animation-delay: 0.2s; opacity: 0; }
+.fade-in-up-3 { animation-delay: 0.3s; opacity: 0; }
+.fade-in-up-4 { animation-delay: 0.4s; opacity: 0; }
+
+/* ─── Slide In Right ───────────────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.slide-in-right {
+  animation: slideInRight 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Slide Out Right ──────────────────────────────────────────────────────── */
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+.slide-out-right {
+  animation: slideOutRight 200ms ease-in forwards;
+}
+
+/* ─── Slide In Up ──────────────────────────────────────────────────────────── */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.slide-in-up {
+  animation: slideInUp 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Card Hover ───────────────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+.card-hover:hover {
+  transform: scale(1.01);
+  box-shadow: 0px 18px 40px 4px rgba(112, 144, 176, 0.12);
+}
+
+/* ─── Button Press ─────────────────────────────────────────────────────────── */
+.btn-press {
+  transition: transform 100ms ease-out;
+}
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* ─── Shimmer / Skeleton ───────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 25%,
+    #f1f5f9 50%,
+    #e2e8f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ─── Typing Indicator ─────────────────────────────────────────────────────── */
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+.typing-dot {
+  animation: typingBounce 1s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ─── Badge Pop ────────────────────────────────────────────────────────────── */
+@keyframes badgePop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.badge-pop {
+  animation: badgePop 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ─── Overlay Fade ─────────────────────────────────────────────────────────── */
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.overlay-fade {
+  animation: overlayFade 200ms ease-out forwards;
+}
+
+/* ─── Stagger Children ─────────────────────────────────────────────────────── */
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeInUp 300ms ease-out forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+
+/* ─── AutoAnimate List ─────────────────────────────────────────────────────── */
+.list-item-enter {
+  animation: fadeInUp 300ms ease-out forwards;
+}
+
+.list-item-exit {
+  animation: fadeIn 150ms ease-in reverse forwards;
+}
+
+/* ─── Mobile Bottom Nav ────────────────────────────────────────────────────── */
+@keyframes bottomNavUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.bottom-nav-anim {
+  animation: bottomNavUp 300ms ease-out forwards;
+}
+
+/* ─── Pulse Urgency ────────────────────────────────────────────────────────── */
+@keyframes pulseUrgency {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.animate-pulse-urgency {
+  animation: pulseUrgency 1.5s ease-in-out infinite;
+}
+
+/* ─── Pull to Refresh Spinner ──────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Scale Y Up (Bar Chart) ───────────────────────────────────────────────── */
+@keyframes scaleYUp {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Growth Momentum chart */
+@keyframes growthMomentumRankPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(91, 76, 255, 0);
+    filter: saturate(1);
+  }
+  28% {
+    box-shadow: 0 0 0 8px rgba(91, 76, 255, 0.12), 0 16px 30px rgba(91, 76, 255, 0.18);
+    filter: saturate(1.12);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(91, 76, 255, 0);
+    filter: saturate(1);
+  }
+}
+
+.growth-momentum-item {
+  position: relative;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.growth-momentum-bar {
+  transform-origin: bottom;
+  transition:
+    height 450ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 180ms ease-out,
+    box-shadow 240ms ease-out,
+    filter 240ms ease-out;
+}
+
+.growth-momentum-item-moved .growth-momentum-bar {
+  animation: growthMomentumRankPulse 820ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.growth-momentum-tooltip {
+  transform: translate(var(--tw-translate-x, 0), 4px);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.growth-momentum-item:hover .growth-momentum-tooltip,
+.growth-momentum-item:focus-visible .growth-momentum-tooltip {
+  transform: translate(var(--tw-translate-x, 0), 0);
+}
+
+
+/* ─── Phase Timeline (SaturationGuard) ─────────────────────────────────────────
+   Theme-aware tokens untuk dot kosong, inner pulse, dan track.
+   Pakai class kustom (bukan utility) supaya tidak terkena global dark
+   override `bg-white` → dark navy. */
+
+.phase-dot-empty {
+  background-color: #FFFFFF;
+  border-color: #CBD5E0;
+}
+.dark .phase-dot-empty {
+  /* Empty state harus terlihat sebagai "available slot" — solid lighter
+     than card background tapi tidak full white biar tidak silau */
+  background-color: hsl(217 33% 28%);
+  border-color: hsl(217 33% 45%);
+}
+
+/* Inner solid circle pada dot active (purple). Selalu putih cerah supaya
+   kontras tinggi dengan ring primary purple, di kedua tema. */
+.phase-dot-inner {
+  background-color: #FFFFFF;
+}
+.dark .phase-dot-inner {
+  background-color: #FFFFFF;
+}
+
+/* Track tipis penghubung antar phase */
+.phase-track {
+  background-color: hsl(220 14% 89%); /* secondary-gray-200 light */
+}
+.dark .phase-track {
+  background-color: hsl(217 33% 30%);
+}
+
+
+/* ─── Phase Badges ─────────────────────────────────────────────────────────────
+   Theme-invariant: visual SAMA di light & dark mode.
+   Pakai class kustom (bukan utility Tailwind) supaya tidak ke-override
+   global dark mode rules. Background pakai full opacity (bukan /15 dark
+   tinted), text pakai shade gelap untuk kontras WCAG AA (>= 4.5:1). */
+
+.phase-badge {
+  /* Base — set in component className with px-2.5 py-1 rounded-full text-xs font-semibold.
+     Empty by design: base styling sudah datang dari utility classes. */
+  display: inline-block;
+}
+
+.phase-badge-emerging {
+  background-color: #DBEAFE; /* blue-100 */
+  color: #1E40AF;            /* blue-800 — kontras 8.6:1 */
+}
+
+.phase-badge-growing {
+  background-color: #D1FAE5; /* emerald-100 */
+  color: #065F46;            /* emerald-800 — kontras 9.2:1 */
+}
+
+.phase-badge-peak {
+  background-color: #FFEDD5; /* orange-100 */
+  color: #9A3412;            /* orange-800 — kontras 8.7:1 */
+}
+
+.phase-badge-decay {
+  background-color: #FEE2E2; /* red-100 */
+  color: #991B1B;            /* red-800 — kontras 8.5:1 */
+}
+
+.phase-badge-default {
+  background-color: #F1F5F9; /* slate-100 */
+  color: #334155;            /* slate-700 */
+}
+
+
+/* ─── Modal Backdrop ───────────────────────────────────────────────────────────
+   Frosted glass overlay untuk semua modal & panel di Nexo.
+   Pattern: heavy blur + saturate boost + tinted overlay.
+   Reference: macOS Big Sur sheet, iOS Control Center.
+
+   Why centralized:
+   1. Konsistensi: 6+ overlay di app pakai class sama, sekali tweak = update semua
+   2. Mode-aware: rule `.dark` di-bawah override otomatis untuk dark mode
+   3. Performance: backdrop-filter di-evaluate sekali per layer
+
+   Why blur 48px:
+   - Cukup kuat untuk "blur semua" — content underneath tidak terbaca lagi,
+     cuma terlihat sebagai ambient color
+   - Tidak terlalu ekstrim sampai content jadi solid block (yang bikin
+     user kehilangan context "saya lagi di page mana")
+
+   Why saturate 180%:
+   - Tanpa saturate, blur bikin warna jadi washed out abu-abu
+   - Saturate 180% pertahankan vibrancy → frosted glass yang terlihat
+     "alive" bukan "dead grey"
+
+   Why tinted overlay:
+   - Layer pemisah antara modal & background — Apple HIG §8.3 Depth
+   - Light mode: white-ish (warmer feel, content underneath stays light)
+   - Dark mode: navy-deep (lebih kontras dengan modal yang putih) */
+
+.modal-backdrop {
+  /* Dim layer pakai opacity tinggi supaya content underneath mostly hidden,
+     blur jadi penekanan ekstra (frosted glass feel). */
+  background-color: rgba(244, 247, 254, 0.75); /* light: 75% */
+  -webkit-backdrop-filter: blur(80px) saturate(180%) !important;
+  backdrop-filter: blur(80px) saturate(180%) !important;
+  isolation: isolate;
+}
+
+.dark .modal-backdrop {
+  background-color: rgba(11, 20, 55, 0.85); /* dark: 85% — nearly opaque navy */
+  -webkit-backdrop-filter: blur(80px) saturate(150%) !important;
+  backdrop-filter: blur(80px) saturate(150%) !important;
+}
+
+/* Fallback untuk browser yang tidak support backdrop-filter (~5% global).
+   Tanpa fallback, modal akan transparent total dan user tidak bisa fokus.
+   Solusi: solid overlay dengan opacity tinggi sebagai pengganti blur. */
+@supports not ((backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0))) {
+  .modal-backdrop {
+    background-color: rgba(244, 247, 254, 0.92);
+  }
+  .dark .modal-backdrop {
+    background-color: rgba(11, 20, 55, 0.92);
+  }
+}
+
+/* SaturationGuard opportunity gauge */
+.opportunity-gauge-track {
+  stroke: #edf1f7;
+}
+
+.dark .opportunity-gauge-track {
+  stroke: hsl(217 33% 25%);
+}
