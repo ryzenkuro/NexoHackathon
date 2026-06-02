@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useNotificationStore } from '@/stores';
 import { useNavigate } from 'react-router-dom';
 import { useTrendStore } from '@/stores';
-import { mockTrends } from '@/mockData';
 import { onActivateKey } from '@/lib/utils';
 import type { Notification } from '@/types';
 
@@ -14,14 +13,13 @@ interface NotificationPanelProps {
 
 export default function NotificationPanel({ onClose, onOpenProduct }: NotificationPanelProps) {
   const { notifications, markAsRead, markAllRead } = useNotificationStore();
-  const { setSelectedTrend } = useTrendStore();
+  const { getTrendById } = useTrendStore();
   const navigate = useNavigate();
 
-  const handleNotifClick = (notif: Notification) => {
-    markAsRead(notif.id);
-    const fullTrend = mockTrends.find((t) => t.id === notif.trendId);
+  const handleNotifClick = async (notif: Notification) => {
+    await markAsRead(notif.id);
+    const fullTrend = notif.trendId ? await getTrendById(notif.trendId) : null;
     if (fullTrend) {
-      setSelectedTrend(fullTrend);
       onClose();
       onOpenProduct();
     } else {
@@ -74,10 +72,10 @@ export default function NotificationPanel({ onClose, onOpenProduct }: Notificati
   const NotifItem = ({ notif, highlighted }: { notif: Notification; highlighted: boolean }) => (
     <div
       key={notif.id}
-      onClick={() => handleNotifClick(notif)}
+      onClick={() => void handleNotifClick(notif)}
       role="button"
       tabIndex={0}
-      onKeyDown={onActivateKey(() => handleNotifClick(notif))}
+      onKeyDown={onActivateKey(() => void handleNotifClick(notif))}
       className={`rounded-3xl p-3 cursor-pointer transition-colors list-item-enter btn-press ${
         highlighted
           ? 'border border-primary/20 bg-white/75 hover:bg-white'

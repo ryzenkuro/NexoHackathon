@@ -11,10 +11,72 @@ function ensureDatabaseReady(res) {
   return false;
 }
 
+function cleanExtractedUrl(value) {
+  return value ? String(value).trim().replace(/[),.]+$/g, '') : null;
+}
+
+function parseLegacyDescription(description) {
+  const text = String(description || '').trim();
+  const sourceTitle = text.match(/Source title:\s*(.*?)(?:\.\s+Source:|\.\s+R2 raw:|$)/i)?.[1]?.trim() || null;
+  const sourceUrl = cleanExtractedUrl(text.match(/Source:\s*(https?:\/\/.*?)(?:\.\s+R2 raw:|$)/i)?.[1]);
+  const rawPayloadUrl = cleanExtractedUrl(text.match(/R2 raw:\s*(https?:\/\/\S+)/i)?.[1]);
+  const markerIndexes = [' Source title:', ' Source:', ' R2 raw:']
+    .map((marker) => text.indexOf(marker))
+    .filter((index) => index >= 0);
+  const firstMarker = markerIndexes.length ? Math.min(...markerIndexes) : -1;
+  const cleanDescription = firstMarker >= 0 ? text.slice(0, firstMarker).trim() : text;
+
+  return {
+    description: sanitizeDisplayDescription(cleanDescription || text),
+    sourceTitle,
+    sourceUrl,
+    rawPayloadUrl,
+  };
+}
+
+function sanitizeDisplayDescription(description) {
+  return String(description || '')
+    .replace(/\s*Snapshot halaman disimpan ke R2 sebagai audit trail;?\s*/gi, ' ')
+    .replace(/\s*metrik live detail membutuhkan akses resmi atau sesi terotorisasi\.?/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.])/g, '$1')
+    .trim();
+}
+
+function normalizeSearchValue(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function getSearchRank(row, query) {
+  const normalizedQuery = normalizeSearchValue(query);
+  const name = normalizeSearchValue(row.name);
+  const category = normalizeSearchValue(row.category);
+  const platform = normalizeSearchValue(row.platform);
+  const description = normalizeSearchValue(row.description);
+  const words = name.split(/\s+/);
+
+  if (name.startsWith(normalizedQuery)) return 0;
+  if (words.some((word) => word.startsWith(normalizedQuery))) return 1;
+  if (normalizedQuery.length <= 2) {
+    if (category.startsWith(normalizedQuery) || platform.startsWith(normalizedQuery)) return 3;
+    return null;
+  }
+  if (name.includes(normalizedQuery)) return 2;
+  if (category.includes(normalizedQuery) || platform.includes(normalizedQuery)) return 3;
+  if (description.includes(normalizedQuery)) return 4;
+  return null;
+}
+
 // Map a DB row to the API shape used by the frontend (Trend type)
 export function mapTrendRow(row) {
   const rawWindowSeconds = row.window_seconds ?? (row.window_hours == null ? 0 : row.window_hours * 3600);
   const windowSeconds = Number.isFinite(Number(rawWindowSeconds)) ? Number(rawWindowSeconds) : 0;
+  const parsed = parseLegacyDescription(row.description);
 
   return {
     id: row.id,
@@ -31,8 +93,13 @@ export function mapTrendRow(row) {
     competitorCount: row.competitor_count,
     avgPrice: row.avg_price,
     reviewVelocity: row.review_velocity,
-    description: row.description,
+    description: parsed.description,
     recommendation: row.recommendation,
+    sourceUrl: row.source_url ?? parsed.sourceUrl,
+    sourceTitle: row.source_title ?? parsed.sourceTitle,
+    rawPayloadUrl: row.raw_payload_url ?? parsed.rawPayloadUrl,
+    evidence: row.evidence ?? parsed.description,
+    confidenceScore: row.confidence_score ?? null,
     updatedAt: row.updated_at ?? row.last_metric_at ?? row.detected_at ?? new Date().toISOString(),
     freshness: 'live',
   };
@@ -143,7 +210,20 @@ export async function searchTrends(req, res) {
       return res.status(500).json({ error: 'Search failed' });
     }
 
-    return res.json({ data: (data ?? []).map(mapTrendRow), sourceStatus: 'database' });
+    const ranked = (data ?? [])
+      .map((row) => ({ row, rank: getSearchRank(row, q) }))
+      .filter((result) => result.rank !== null)
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        if (Number(b.row.growth || 0) !== Number(a.row.growth || 0)) {
+          return Number(b.row.growth || 0) - Number(a.row.growth || 0);
+        }
+        return String(a.row.name || '').localeCompare(String(b.row.name || ''), 'id', { sensitivity: 'base' });
+      })
+      .slice(0, 20)
+      .map(({ row }) => mapTrendRow(row));
+
+    return res.json({ data: ranked, sourceStatus: 'database' });
   } catch (error) {
     console.error('Search trends error:', error);
     return res.status(500).json({ error: 'Search failed', sourceStatus: 'database-error' });

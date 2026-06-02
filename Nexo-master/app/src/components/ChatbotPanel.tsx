@@ -64,25 +64,19 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const trend = selectedTrend ?? {
-    id: 'demo-trend-2',
-    name: 'Lampu Tidur 3D Moon',
-    saturation: 30,
-    windowHours: 48,
-    category: 'umum',
-  };
+  const trend = selectedTrend;
 
-  const session = useChatStore((state) => state.sessions[trend.id]);
+  const session = useChatStore((state) => trend ? state.sessions[trend.id] : undefined);
   const messages = useMemo(() => session?.messages ?? [], [session]);
-  const welcome = welcomes[trend.id];
-  const isWelcomeLoading = Boolean(welcomeLoading[trend.id]);
-  const welcomeError = welcomeErrors[trend.id];
+  const welcome = trend ? welcomes[trend.id] : undefined;
+  const isWelcomeLoading = Boolean(trend && welcomeLoading[trend.id]);
+  const welcomeError = trend ? welcomeErrors[trend.id] : undefined;
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (trend && messages.length === 0) {
       fetchWelcome(trend.id);
     }
-  }, [fetchWelcome, messages.length, trend.id]);
+  }, [fetchWelcome, messages.length, trend]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -99,7 +93,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
 
   const handleSend = useCallback((preset?: string) => {
     const text = (preset ?? input).trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || !trend) return;
 
     if (!isAuthenticated) {
       addMessage(trend.id, 'assistant', 'Silakan login terlebih dahulu untuk menggunakan fitur chat.');
@@ -115,7 +109,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
 
     setInput('');
     streamChat(trend.id, text, trend.name);
-  }, [input, isStreaming, trend.id, trend.name, dailyCount, isAuthenticated, addMessage, streamChat]);
+  }, [input, isStreaming, trend, dailyCount, isAuthenticated, addMessage, streamChat]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -125,6 +119,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
   };
 
   const handleClearChat = () => {
+    if (!trend) return;
     clearSession(trend.id);
   };
 
@@ -143,10 +138,12 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
             <X size={20} />
           </button>
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-navy-900">{trend.name}</p>
+            <p className="truncate text-sm font-black text-navy-900">{trend?.name ?? 'Pilih tren'}</p>
             <div className="mt-1 flex items-center gap-1 text-xs text-secondary-gray-500">
               <Lock size={10} />
-              <span className="truncate">Nexo membahas: {trend.name}</span>
+              <span className="truncate">
+                {trend ? `Nexo membahas: ${trend.name}` : 'Buka detail produk untuk mulai bertanya'}
+              </span>
             </div>
           </div>
         </div>
@@ -175,7 +172,16 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
       </div>
 
       <div ref={scrollRef} className="scrollbar-hide min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        {messages.length === 0 && !isStreaming && (
+        {!trend ? (
+          <div className="flex justify-start fade-in-up">
+            <div className="max-w-[88%] rounded-3xl rounded-bl-md bg-white/75 px-4 py-3 text-sm leading-relaxed text-navy-900 shadow-sm">
+              <p className="font-bold">Pilih tren terlebih dahulu.</p>
+              <p className="mt-2 text-secondary-gray-600">
+                Buka produk viral atau konten terkait, lalu tekan Tanya Nexo agar analisis memakai data Supabase yang tepat.
+              </p>
+            </div>
+          </div>
+        ) : messages.length === 0 && !isStreaming && (
           <div className="space-y-3">
             {isWelcomeLoading && !welcome ? (
               <WelcomeSkeleton />
@@ -260,17 +266,17 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Tanya tentang ${trend.name}...`}
+            placeholder={trend ? `Tanya tentang ${trend.name}...` : 'Pilih tren untuk mulai bertanya...'}
             rows={1}
             aria-label="Pesan ke Nexo"
             className="soft-input scrollbar-hide min-h-[44px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-2xl px-4 py-3 text-sm"
           />
           <button
             onClick={() => handleSend()}
-            disabled={!input.trim() || isStreaming || dailyCount >= APP_CONFIG.maxChatsPerDay}
+            disabled={!trend || !input.trim() || isStreaming || dailyCount >= APP_CONFIG.maxChatsPerDay}
             aria-label="Kirim pesan"
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-colors btn-press ${
-              input.trim() && !isStreaming && dailyCount < APP_CONFIG.maxChatsPerDay
+              trend && input.trim() && !isStreaming && dailyCount < APP_CONFIG.maxChatsPerDay
                 ? 'bg-navy-900 text-white hover:bg-primary'
                 : 'bg-secondary-gray-200 text-secondary-gray-500 cursor-not-allowed'
             }`}

@@ -7,15 +7,52 @@ function getDecision(saturation) {
   return 'Jenuh';
 }
 
+function buildRecommendation(trend, decision) {
+  const price = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
+    .format(Number(trend.avgPrice || 0));
+
+  if (decision === 'Jenuh') {
+    return `${trend.name} sebaiknya tidak langsung distok besar. Saturation ${trend.saturation}% dengan ${trend.competitorCount} kompetitor perlu diferensiasi kuat atau cari variasi produk yang lebih sempit.`;
+  }
+
+  if (decision === 'Waspada') {
+    return `${trend.name} masih bisa diuji terbatas. Mulai dari stok kecil, jaga harga sekitar ${price}, dan validasi konten sebelum tambah budget.`;
+  }
+
+  return `${trend.name} punya peluang masuk yang sehat. Prioritaskan validasi cepat, konten pendek, dan harga sekitar ${price} selama window ${trend.windowHours} jam masih terbuka.`;
+}
+
+function buildReasoning(trend, opportunityScore) {
+  return [
+    `Opportunity score ${opportunityScore}% dihitung dari saturation ${trend.saturation}/100.`,
+    `Growth ${trend.growth}% dan phase ${trend.phase} menunjukkan momentum ${Number(trend.growth) >= 120 ? 'kuat' : 'bertahap'}.`,
+    `Window tersisa sekitar ${trend.windowHours} jam dengan review velocity ${trend.reviewVelocity} per hari.`,
+  ];
+}
+
+function buildRiskFactors(trend) {
+  const risks = [];
+  if (trend.saturation >= 60) risks.push(`Saturation tinggi (${trend.saturation}%) membuat biaya diferensiasi lebih besar.`);
+  if (trend.competitorCount >= 60) risks.push(`Kompetitor sudah padat (${trend.competitorCount} seller terdeteksi).`);
+  if (trend.windowHours <= 24) risks.push(`Window tinggal ${trend.windowHours} jam, validasi harus sangat cepat.`);
+  if (trend.reviewVelocity < 10) risks.push(`Review velocity masih rendah (${trend.reviewVelocity}/hari), sinyal demand perlu dicek ulang.`);
+  if (!risks.length) risks.push('Risiko utama ada pada eksekusi konten dan kontrol stok awal.');
+  return risks;
+}
+
 function toSaturationDetail(row) {
   const trend = mapTrendRow(row);
   const opportunityScore = Math.max(0, Math.min(100, Math.round(100 - trend.saturation)));
+  const decision = getDecision(trend.saturation);
 
   return {
     ...trend,
+    recommendation: buildRecommendation(trend, decision),
     trendId: trend.id,
     opportunityScore,
-    decision: getDecision(trend.saturation),
+    decision,
+    reasoning: buildReasoning(trend, opportunityScore),
+    riskFactors: buildRiskFactors(trend),
     competitorDensity: [
       { day: 'Sen', count: Math.round(trend.competitorCount * 0.6) },
       { day: 'Sel', count: Math.round(trend.competitorCount * 0.7) },

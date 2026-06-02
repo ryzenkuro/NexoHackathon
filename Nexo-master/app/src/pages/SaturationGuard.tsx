@@ -8,12 +8,14 @@ import {
   Star,
   TrendingUp,
   Users,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { API_URL } from '@/lib/constants';
 import { useTrendStore } from '@/stores';
 import { getSaturationDecision } from '@/lib/utils';
 import { GlossaryTooltip } from '@/components/GlossaryTooltip';
-import type { SaturationDetail, Trend } from '@/types';
+import type { SaturationDetail, Trend, AiTrendRecommendationResponse } from '@/types';
 
 const phases = ['Emerging', 'Growing', 'Peak', 'Decay'] as const;
 type PhaseTerm = 'emerging' | 'growing' | 'peak' | 'decay';
@@ -29,6 +31,18 @@ const rollingMetricTiming = {
 const rollingMetricFormat = {
   useGrouping: true,
 } satisfies Intl.NumberFormatOptions;
+const AI_SATURATION_CACHE_TTL_MS = 10 * 60 * 1000;
+const aiSaturationCache = new Map<string, { data: AiTrendRecommendationResponse; expiresAt: number }>();
+
+function getCachedAiSaturation(trendId: string) {
+  const cached = aiSaturationCache.get(trendId);
+  if (!cached) return null;
+  if (Date.now() > cached.expiresAt) {
+    aiSaturationCache.delete(trendId);
+    return null;
+  }
+  return cached.data;
+}
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -113,10 +127,14 @@ export default function SaturationGuard() {
   const { selectedTrend: globalSelected } = useTrendStore();
   const [apiTrend, setApiTrend] = useState<SaturationDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const selectedTrend: Trend | SaturationDetail | null = apiTrend ?? globalSelected;
+  const [aiRecommendation, setAiRecommendation] = useState<AiTrendRecommendationResponse | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const selectedTrend: Trend | SaturationDetail | null =
+    apiTrend && (!globalSelected?.id || apiTrend.id === globalSelected.id) ? apiTrend : globalSelected;
 
   useEffect(() => {
     let cancelled = false;
+    setApiTrend(null);
 
     async function loadSaturation() {
       try {
@@ -143,6 +161,50 @@ export default function SaturationGuard() {
     };
   }, [globalSelected?.id]);
 
+  useEffect(() => {
+    if (!selectedTrend?.id) return undefined;
+    const selectedTrendId = selectedTrend.id;
+
+    const cached = getCachedAiSaturation(selectedTrendId);
+    if (cached) {
+      setAiRecommendation(cached);
+      setIsAiLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setAiRecommendation(null);
+    setIsAiLoading(true);
+
+    async function loadAiRecommendation() {
+      try {
+        const res = await fetch(`${API_URL}/ai/trends/${selectedTrendId}/recommendation?mode=saturation`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Gagal membuat rekomendasi AI');
+        const data = json.data as AiTrendRecommendationResponse;
+        if (!data) throw new Error('Rekomendasi AI kosong');
+        aiSaturationCache.set(selectedTrendId, {
+          data,
+          expiresAt: Date.now() + AI_SATURATION_CACHE_TTL_MS,
+        });
+        if (!cancelled) setAiRecommendation(data);
+      } catch (error) {
+        if (!cancelled && (error as Error).name !== 'AbortError') setAiRecommendation(null);
+      } finally {
+        if (!cancelled) setIsAiLoading(false);
+      }
+    }
+
+    void loadAiRecommendation();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [selectedTrend?.id]);
+
   const opportunityScore = clampScore(
     selectedTrend && 'opportunityScore' in selectedTrend
       ? (selectedTrend as SaturationDetail).opportunityScore
@@ -162,11 +224,12 @@ export default function SaturationGuard() {
   const linePosRef = useRef(linePos);
   const lineAnimRef = useRef<number | null>(null);
 
+  const hasSelectedTrend = Boolean(selectedTrend);
   const currentPhaseIndex = phases.indexOf((selectedTrend?.phase ?? 'Emerging') as typeof phases[number]);
   const satLabel = getSaturationDecision(selectedTrend?.saturation ?? 0);
 
   useEffect(() => {
-    if (!selectedTrend) return undefined;
+    if (!hasSelectedTrend) return undefined;
 
     setShowRecommendation(false);
     if (gaugeAnimRef.current) cancelAnimationFrame(gaugeAnimRef.current);
@@ -205,10 +268,10 @@ export default function SaturationGuard() {
       if (gaugeAnimRef.current) cancelAnimationFrame(gaugeAnimRef.current);
       if (recommendationTimer) window.clearTimeout(recommendationTimer);
     };
-  }, [opportunityScore, selectedTrend?.id]);
+  }, [hasSelectedTrend, opportunityScore, selectedTrend?.id]);
 
   useEffect(() => {
-    if (!selectedTrend) return undefined;
+    if (!hasSelectedTrend) return undefined;
 
     if (lineAnimRef.current) cancelAnimationFrame(lineAnimRef.current);
 
@@ -241,7 +304,7 @@ export default function SaturationGuard() {
     return () => {
       if (lineAnimRef.current) cancelAnimationFrame(lineAnimRef.current);
     };
-  }, [currentPhaseIndex, selectedTrend?.id]);
+  }, [currentPhaseIndex, hasSelectedTrend, selectedTrend?.id]);
 
   if (!selectedTrend) {
     return (
@@ -422,13 +485,99 @@ export default function SaturationGuard() {
           </div>
 
           <div className={`mt-5 rounded-3xl border p-5 ${satLabel.bg} ${satLabel.border} fade-in-up ${showRecommendation ? 'opacity-100' : 'opacity-0'}`}>
-            <div className="flex items-start gap-3">
-              <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
-              <div>
-                <p className="mb-1 text-sm font-black text-navy-900">Rekomendasi</p>
-                <p className="text-sm leading-relaxed text-navy-700">{selectedTrend.recommendation}</p>
+            {isAiLoading && !aiRecommendation ? (
+              <div className="flex items-start gap-3">
+                <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 shimmer rounded w-1/3" />
+                  <div className="h-3 shimmer rounded w-full" />
+                  <div className="h-3 shimmer rounded w-5/6" />
+                </div>
               </div>
-            </div>
+            ) : aiRecommendation?.structured ? (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+                    <p className="text-sm font-black text-navy-900">Rekomendasi</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-navy-900">
+                    {aiRecommendation.structured.decision}
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed text-navy-700">
+                  {aiRecommendation.structured.summary}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {aiRecommendation.structured.reasons.length > 0 && (
+                    <div className="rounded-2xl bg-white/55 p-3">
+                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Alasan</p>
+                      <ul className="space-y-1.5">
+                        {aiRecommendation.structured.reasons.slice(0, 2).map((reason, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                            <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiRecommendation.structured.risks && aiRecommendation.structured.risks.length > 0 && (
+                    <div className="rounded-2xl bg-white/55 p-3">
+                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko Utama</p>
+                      <ul className="space-y-1.5">
+                        {aiRecommendation.structured.risks.slice(0, 2).map((risk, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                            <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />
+                            <span>{risk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                {aiRecommendation.structured.actions.length > 0 && (
+                  <div className="rounded-2xl bg-navy-900/5 p-3">
+                    <p className="mb-2 text-xs font-black uppercase tracking-wide text-navy-900">Aksi 24 Jam</p>
+                    <ul className="space-y-1.5">
+                      {aiRecommendation.structured.actions.slice(0, 2).map((action, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                          <span className="mt-0.5 shrink-0 font-black text-primary">{i + 1}.</span>
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+                <div>
+                  <p className="mb-1 text-sm font-black text-navy-900">Rekomendasi</p>
+                  <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
+                    {aiRecommendation?.text || selectedTrend.recommendation}
+                  </p>
+                  {!aiRecommendation && 'reasoning' in selectedTrend && Array.isArray(selectedTrend.reasoning) && (
+                    <div className="mt-3 space-y-1">
+                      {selectedTrend.reasoning.map((item) => (
+                        <p key={item} className="text-xs leading-relaxed text-navy-700">- {item}</p>
+                      ))}
+                    </div>
+                  )}
+                  {!aiRecommendation && 'riskFactors' in selectedTrend && Array.isArray(selectedTrend.riskFactors) && (
+                    <div className="mt-3 rounded-2xl bg-white/55 p-3">
+                      <p className="text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko utama</p>
+                      <div className="mt-2 space-y-1">
+                        {selectedTrend.riskFactors.map((item) => (
+                          <p key={item} className="text-xs leading-relaxed text-navy-700">- {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

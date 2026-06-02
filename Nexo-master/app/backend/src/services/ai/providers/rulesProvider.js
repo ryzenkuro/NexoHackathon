@@ -1,3 +1,8 @@
+import {
+  buildContentStructuredInsight,
+  buildTrendStructuredInsight,
+} from '../insightGenerator.js';
+
 function formatCurrency(value) {
   const number = Number(value || 0);
   if (!Number.isFinite(number) || number <= 0) return 'Rp 1.000.000 - Rp 3.000.000';
@@ -24,7 +29,7 @@ function dashboardInsight(variables) {
   const riskiest = [...topItems].sort((a, b) => b.saturation - a.saturation)[0];
 
   return `1. Ringkasan kondisi pasar
-Ada ${metrics.activeTrends ?? 0} tren aktif dengan rata-rata saturation ${metrics.avgSaturation ?? 0}%. Momentum pasar dibaca dari data Supabase dan aset riset yang tersimpan di R2.
+Ada ${metrics.activeTrends ?? 0} tren aktif dengan rata-rata saturation ${metrics.avgSaturation ?? 0}%. Momentum pasar masih terbaca, jadi keputusan demo sebaiknya fokus pada produk yang cepat divalidasi dan mudah dibedakan.
 
 2. Peluang paling kuat
 Prioritaskan ${best?.name || 'produk dengan growth tertinggi'} karena growth ${best?.growth ?? 0}% dan saturation ${best?.saturation ?? 0}%. Keputusan awal: ${getDecision(best)}.
@@ -39,50 +44,27 @@ Risiko terbesar ada di ${riskiest?.name || 'produk paling jenuh'} dengan saturat
 }
 
 function trendRecommendation(variables) {
-  const trend = variables.trend || {};
-  const decision = getDecision(trend);
-  const windowHours = Math.max(0, Math.ceil((trend.windowSeconds || trend.windowHours * 3600 || 0) / 3600));
+  return JSON.stringify(
+    buildTrendStructuredInsight(variables.trend || {}, { mode: 'trend' }),
+    null,
+    2
+  );
+}
 
-  return `Keputusan: ${decision}
-
-Alasan:
-- Growth ${trend.growth ?? 0}% menunjukkan demand sedang ${Number(trend.growth) >= 150 ? 'kuat' : 'bertumbuh'}.
-- Saturation ${trend.saturation ?? 0}% berarti kompetisi ${Number(trend.saturation) >= 60 ? 'tinggi' : 'masih bisa dikelola'}.
-- Window tersisa sekitar ${windowHours} jam, jadi eksekusi harus cepat.
-
-Estimasi modal awal:
-- Mulai dari ${formatCurrency(trend.avgPrice)} untuk validasi stok kecil.
-- Target 20-40 pcs dulu, jangan langsung overstock.
-
-Strategi konten:
-- Buat 3 video pendek: unboxing, problem-solution, dan perbandingan harga.
-- Pakai CTA "stok terbatas" hanya jika stok benar-benar terbatas.
-
-Risiko:
-- Kompetitor sekitar ${trend.competitorCount ?? 0} seller.
-- Jika review velocity turun atau saturation naik di atas 65%, pindah ke variasi produk lain.`;
+function saturationRecommendation(variables) {
+  return JSON.stringify(
+    buildTrendStructuredInsight(variables.trend || {}, { mode: 'saturation' }),
+    null,
+    2
+  );
 }
 
 function contentAnalysis(variables) {
-  const content = variables.content || {};
-  const trend = variables.trend || {};
-
-  return `Analisis konten: ${content.title || 'Konten viral'}
-
-Hook yang bisa ditiru:
-- "Aku kira biasa aja, ternyata kepakai tiap hari."
-- "Barang kecil yang bikin rutinitas lebih rapi."
-
-Angle jualan:
-- Kaitkan dengan produk ${trend.name || 'terkait'} dan tampilkan manfaat dalam 3 detik pertama.
-- Tampilkan harga, ukuran, dan cara pakai tanpa terlalu lama.
-
-CTA:
-- "Cek stok hari ini sebelum harga naik."
-- "Komentar mau warna/varian apa."
-
-Risiko:
-- Engagement ${content.engagement || '-'} bagus untuk validasi, tapi tetap cek saturation ${trend.saturation ?? 0}% sebelum masuk stok besar.`;
+  return JSON.stringify(
+    buildContentStructuredInsight(variables.content || {}, variables.trend || null),
+    null,
+    2
+  );
 }
 
 function chatResponse(variables) {
@@ -121,6 +103,9 @@ export async function completeWithRules({ promptId, variables }) {
       break;
     case 'trend_recommendation':
       text = trendRecommendation(variables);
+      break;
+    case 'saturation_recommendation':
+      text = saturationRecommendation(variables);
       break;
     case 'content_analysis':
       text = contentAnalysis(variables);

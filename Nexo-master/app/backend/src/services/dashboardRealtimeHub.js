@@ -31,7 +31,7 @@ export function addDashboardClient(req, res) {
 export function startDashboardRealtimeHub() {
   if (broadcastTimer) return;
 
-  const intervalMs = Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || 1000);
+  const intervalMs = Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || 5 * 60 * 1000);
   broadcastTimer = setInterval(async () => {
     if (clients.size === 0) return;
 

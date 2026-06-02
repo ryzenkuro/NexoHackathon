@@ -1,18 +1,103 @@
-import { X, TrendingUp, Users, DollarSign, Star, MessageCircle, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, TrendingUp, Users, DollarSign, Star, MessageCircle, Clock, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useTrendStore } from '@/stores';
-import { mockTrends } from '@/mockData';
-import { getSaturationDecision, getCategoryLabel, formatRupiah, formatGrowth } from '@/lib/utils';
+import { API_URL } from '@/lib/constants';
+import { getSaturationDecision, getCategoryLabel, formatRupiah, formatGrowth, hideBrokenImage } from '@/lib/utils';
 import { GlossaryTooltip } from '@/components/GlossaryTooltip';
+import type { AiTrendRecommendationResponse } from '@/types';
 
 interface ProductDetailModalProps {
   onClose: () => void;
   onOpenChat: () => void;
 }
 
+const AI_RECOMMENDATION_CACHE_TTL_MS = 10 * 60 * 1000;
+const aiRecommendationCache = new Map<string, { data: AiTrendRecommendationResponse; expiresAt: number }>();
+
+function getCachedAiRecommendation(trendId: string) {
+  const cached = aiRecommendationCache.get(trendId);
+  if (!cached) return null;
+  if (Date.now() > cached.expiresAt) {
+    aiRecommendationCache.delete(trendId);
+    return null;
+  }
+  return cached.data;
+}
+
 export default function ProductDetailModal({ onClose, onOpenChat }: ProductDetailModalProps) {
   const { selectedTrend, setSelectedTrend, trends } = useTrendStore();
-  const trendList = trends.length > 0 ? trends : mockTrends;
-  const trend = selectedTrend ?? trendList[0];
+  const trendList = trends;
+  const trend = selectedTrend;
+  const [aiRecommendation, setAiRecommendation] = useState<AiTrendRecommendationResponse | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (!trend?.id) return undefined;
+    const trendId = trend.id;
+
+    const cached = getCachedAiRecommendation(trendId);
+    if (cached) {
+      setAiRecommendation(cached);
+      setIsAiLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setAiRecommendation(null);
+    setIsAiLoading(true);
+
+    async function loadAiRecommendation() {
+      try {
+        const res = await fetch(`${API_URL}/ai/trends/${trendId}/recommendation`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Gagal membuat ringkasan AI');
+        const data = json.data as AiTrendRecommendationResponse;
+        if (!data) throw new Error('Ringkasan AI kosong');
+        aiRecommendationCache.set(trendId, {
+          data,
+          expiresAt: Date.now() + AI_RECOMMENDATION_CACHE_TTL_MS,
+        });
+        if (!cancelled) setAiRecommendation(data);
+      } catch (error) {
+        if (!cancelled && (error as Error).name !== 'AbortError') setAiRecommendation(null);
+      } finally {
+        if (!cancelled) setIsAiLoading(false);
+      }
+    }
+
+    void loadAiRecommendation();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [trend?.id]);
+
+  if (!trend) {
+    return (
+      <div
+        className="premium-shell w-full max-w-md rounded-3xl p-6 text-center shadow-2xl fade-in-up"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Detail produk"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Tutup modal"
+          className="ml-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-navy-900 shadow-sm transition-colors hover:bg-white btn-press"
+        >
+          <X size={18} />
+        </button>
+        <p className="mt-3 text-lg font-black text-navy-900">Pilih tren terlebih dahulu</p>
+        <p className="mt-2 text-sm leading-relaxed text-secondary-gray-500">
+          Detail produk akan muncul setelah data tren dipilih dari daftar atau hasil pencarian.
+        </p>
+      </div>
+    );
+  }
+
   const satStyle = getSaturationDecision(trend.saturation);
 
   const foundIndex = trendList.findIndex((t) => t.id === trend.id);
@@ -40,7 +125,7 @@ export default function ProductDetailModal({ onClose, onOpenChat }: ProductDetai
             src={trend.thumbnail}
             alt={trend.name}
             loading="lazy"
-            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/400/300`; }}
+            onError={hideBrokenImage}
             className="h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
@@ -100,10 +185,73 @@ export default function ProductDetailModal({ onClose, onOpenChat }: ProductDetai
           </div>
 
           <div className={`mb-5 rounded-3xl border p-4 ${satStyle.bg} ${satStyle.border}`}>
-            <div className="mb-2">
-              <span className={`text-sm font-black ${satStyle.color}`}>{satStyle.label}</span>
-            </div>
-            <p className="text-sm leading-relaxed text-navy-700">{trend.recommendation}</p>
+            {isAiLoading && !aiRecommendation ? (
+              <div className="space-y-2">
+                <div className="h-4 shimmer rounded w-1/3" />
+                <div className="h-3 shimmer rounded w-full" />
+                <div className="h-3 shimmer rounded w-5/6" />
+              </div>
+            ) : aiRecommendation?.structured ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-sm font-black ${satStyle.color}`}>{satStyle.label}</span>
+                  <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-navy-900">
+                    {aiRecommendation.structured.decision}
+                  </span>
+                </div>
+                <p className="text-sm leading-relaxed text-navy-700">
+                  {aiRecommendation.structured.summary}
+                </p>
+                {aiRecommendation.structured.reasons.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Alasan</p>
+                    <ul className="space-y-1">
+                      {aiRecommendation.structured.reasons.slice(0, 2).map((reason, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-navy-700">
+                          <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-primary" />
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {aiRecommendation.structured.risks && aiRecommendation.structured.risks.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko</p>
+                    <ul className="space-y-1">
+                      {aiRecommendation.structured.risks.slice(0, 2).map((risk, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-navy-700">
+                          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                          <span>{risk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {aiRecommendation.structured.actions.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Aksi Cepat</p>
+                    <ul className="space-y-1">
+                      {aiRecommendation.structured.actions.slice(0, 2).map((action, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-navy-700">
+                          <span className="mt-0.5 shrink-0 font-black text-primary">{i + 1}.</span>
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div className="mb-2">
+                  <span className={`text-sm font-black ${satStyle.color}`}>{satStyle.label}</span>
+                </div>
+                <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
+                  {aiRecommendation?.text || trend.recommendation}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mb-4 flex gap-3">

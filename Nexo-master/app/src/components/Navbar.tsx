@@ -3,7 +3,8 @@ import { Search, Bell, LogOut, User, X, Moon, Sun, MessageCircle, Command } from
 import { useTheme } from 'next-themes';
 import { useAuthStore, useTrendStore } from '@/stores';
 import { useNotificationStore } from '@/stores';
-import { clearStoredAuth, formatGrowth } from '@/lib/utils';
+import { clearStoredAuth, formatGrowth, hideBrokenImage } from '@/lib/utils';
+import { API_URL } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Trend } from '@/types';
@@ -110,8 +111,13 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
   const { unreadCount } = useNotificationStore();
   const { searchQuery, setSearchQuery, trends } = useTrendStore();
   const [showResults, setShowResults] = useState(false);
+  const [remoteResults, setRemoteResults] = useState<Trend[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const desktopSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const path = location.pathname;
   const searchContext: { placeholder: string; behavior: 'modal' | 'select' | 'navigate' } =
@@ -133,7 +139,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
   const toggleDark = () => setTheme(isDark ? 'light' : 'dark');
 
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
-  const searchResults: Trend[] = useMemo(() => {
+  const localSearchResults: Trend[] = useMemo(() => {
     if (normalizedSearchQuery.length < 1) return [];
 
     return trends
@@ -148,19 +154,63 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
   }, [normalizedSearchQuery, trends]);
 
   useEffect(() => {
+    if (normalizedSearchQuery.length < 2) {
+      setRemoteResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${API_URL}/trends/search?q=${encodeURIComponent(searchQuery)}`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Pencarian gagal');
+        setRemoteResults(json.data ?? []);
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') setRemoteResults([]);
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [normalizedSearchQuery, searchQuery]);
+
+  const searchResults = normalizedSearchQuery.length >= 2 ? remoteResults : localSearchResults;
+
+  useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const isInsideDesktopSearch = desktopSearchRef.current?.contains(target);
+      const isInsideMobileSearch = mobileSearchRef.current?.contains(target);
+
+      if (!isInsideDesktopSearch && !isInsideMobileSearch) {
         setShowResults(false);
+        setMobileSearchOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const openMobileSearch = () => {
+    setMobileSearchOpen(true);
+    setShowResults(true);
+    window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
+  };
+
   const handleSelectResult = (trend: Trend) => {
     useTrendStore.getState().setSelectedTrend(trend);
     setSearchQuery('');
     setShowResults(false);
+    setMobileSearchOpen(false);
 
     if (searchContext.behavior === 'select') {
       return;
@@ -180,7 +230,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         <span className="font-black text-navy-900">Nexo</span>
       </div>
 
-      <div ref={searchRef} className="hidden md:flex flex-1 max-w-xl relative">
+      <div ref={desktopSearchRef} className="hidden md:flex flex-1 max-w-xl relative">
         <div className="relative w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-gray-500" size={18} />
           <input
@@ -226,7 +276,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
                   src={trend.thumbnail}
                   alt={trend.name}
                   loading="lazy"
-                  onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/400/300`; }}
+                  onError={hideBrokenImage}
                   className="h-11 w-11 flex-shrink-0 rounded-2xl object-cover"
                 />
                 <div className="min-w-0 flex-1">
@@ -240,7 +290,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
           </div>
         )}
 
-        {showResults && normalizedSearchQuery.length >= 1 && searchResults.length === 0 && (
+        {showResults && normalizedSearchQuery.length >= 1 && searchResults.length === 0 && !isSearching && (
           <div className="absolute top-full left-0 right-0 mt-3 rounded-3xl border border-white/80 bg-white/95 px-4 py-4 shadow-card z-50 fade-in">
             <p className="text-sm font-bold text-navy-900">Tidak ada hasil</p>
             <p className="text-xs text-secondary-gray-500">Tidak ada hasil untuk "{searchQuery}"</p>
@@ -249,6 +299,83 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
       </div>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <div ref={mobileSearchRef} className="md:hidden">
+          <button
+            type="button"
+            onClick={openMobileSearch}
+            aria-label={searchContext.placeholder}
+            className="h-11 w-11 icon-button bg-white/55 btn-press"
+          >
+            <Search size={19} />
+          </button>
+
+          {mobileSearchOpen && (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 px-0 md:hidden">
+              <div className="rounded-3xl border border-white/80 bg-white/95 p-3 shadow-card-hover backdrop-blur-xl fade-in-up">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-secondary-gray-500" size={18} />
+                  <input
+                    ref={mobileSearchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowResults(true);
+                    }}
+                    onFocus={() => setShowResults(true)}
+                    placeholder={searchContext.placeholder}
+                    aria-label={searchContext.placeholder}
+                    className="soft-input h-12 w-full rounded-2xl pl-11 pr-12 text-sm"
+                  />
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(''); setShowResults(false); }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary-gray-400 hover:text-navy-700 btn-press"
+                      aria-label="Hapus pencarian"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </div>
+
+                {showResults && searchResults.length > 0 && (
+                  <div className="mt-2 max-h-72 overflow-y-auto rounded-2xl">
+                    {searchResults.map((trend) => (
+                      <button
+                        key={trend.id}
+                        onClick={() => handleSelectResult(trend)}
+                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-secondary-gray-50"
+                      >
+                        <img
+                          src={trend.thumbnail}
+                          alt={trend.name}
+                          loading="lazy"
+                          onError={hideBrokenImage}
+                          className="h-11 w-11 flex-shrink-0 rounded-2xl object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-navy-900">
+                            {renderHighlightedName(trend.name, searchQuery)}
+                          </p>
+                          <p className="text-xs text-secondary-gray-500">{trend.platform} / {formatGrowth(trend.growth)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showResults && normalizedSearchQuery.length >= 1 && searchResults.length === 0 && !isSearching && (
+                  <div className="mt-2 rounded-2xl px-3 py-3">
+                    <p className="text-sm font-bold text-navy-900">Tidak ada hasil</p>
+                    <p className="text-xs text-secondary-gray-500">Tidak ada hasil untuk "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={onChatToggle}
           aria-label="Buka chat Nexo"

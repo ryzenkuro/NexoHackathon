@@ -10,7 +10,8 @@
     "ingest:research": "node src/scripts/ingestResearchData.js",
     "ingest:platform-keywords": "node src/scripts/ingestPlatformKeywords.js",
     "ingest:videos": "node src/scripts/ingestTrendingVideos.js",
-    "repair:trend-thumbnails": "node src/scripts/repairTrendThumbnails.js"
+    "repair:trend-thumbnails": "node src/scripts/repairTrendThumbnails.js",
+    "repair:duplicate-thumbnails": "node src/scripts/repairDuplicateTrendThumbnails.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1057.0",

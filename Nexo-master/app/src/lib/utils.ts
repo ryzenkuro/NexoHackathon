@@ -132,6 +132,12 @@ export function getGrowthColor(value: number): string {
   return 'text-secondary-gray-600';
 }
 
+export function hideBrokenImage(event: React.SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  image.removeAttribute('src');
+  image.style.opacity = '0';
+}
+
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 export function getStoredAuth(): { name: string; phone: string } | null {

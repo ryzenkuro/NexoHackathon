@@ -18,12 +18,20 @@ function applyUserFilter(query, userId) {
   return userId ? query.eq('user_id', userId) : query;
 }
 
+function normalizeUrgency(value) {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'critical' || normalized === 'danger') return 'Critical';
+  if (normalized === 'high' || normalized === 'warning') return 'High';
+  if (normalized === 'medium' || normalized === 'info') return 'Medium';
+  return 'Low';
+}
+
 function mapNotification(row) {
   return {
     id: row.id,
     trendId: row.trend_id,
     trendName: row.trend_name,
-    urgency: row.urgency,
+    urgency: normalizeUrgency(row.urgency),
     windowHours: row.window_hours,
     timestamp: row.created_at,
     read: Boolean(row.read),

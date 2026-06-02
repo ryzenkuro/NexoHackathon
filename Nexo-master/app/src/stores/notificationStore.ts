@@ -14,6 +14,21 @@ interface NotificationState {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+function normalizeUrgency(value: unknown): Notification['urgency'] {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'critical' || normalized === 'danger') return 'Critical';
+  if (normalized === 'high' || normalized === 'warning') return 'High';
+  if (normalized === 'medium' || normalized === 'info') return 'Medium';
+  return 'Low';
+}
+
+function normalizeNotification(item: Notification): Notification {
+  return {
+    ...item,
+    urgency: normalizeUrgency(item.urgency),
+  };
+}
+
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
@@ -25,7 +40,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       const res = await fetch(`${API_URL}/notifications`);
       const data = await res.json();
       if (res.ok) {
-        const notifications = data.data || [];
+        const notifications = (data.data || []).map(normalizeNotification);
         const unreadCount = notifications.filter((n: Notification) => !n.read).length;
         set({ notifications, unreadCount, isLoading: false });
       }

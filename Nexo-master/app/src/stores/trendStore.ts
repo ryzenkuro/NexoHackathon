@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Trend } from '@/types';
 
+const DEFAULT_TREND_LIMIT = 100;
+
 interface TrendState {
   trends: Trend[];
   selectedTrend: Trend | null;
@@ -17,8 +19,8 @@ interface TrendState {
     sort: string;
   };
   
-  fetchTrends: (page?: number) => Promise<void>;
-  searchTrends: (query: string) => Promise<void>;
+  fetchTrends: (page?: number, limit?: number) => Promise<void>;
+  searchTrends: (query: string) => Promise<Trend[]>;
   getTrendById: (id: string) => Promise<Trend | null>;
   setSelectedTrend: (trend: Trend | null) => void;
   setSearchQuery: (q: string) => void;
@@ -43,13 +45,13 @@ export const useTrendStore = create<TrendState>((set, get) => ({
     sort: 'window',
   },
 
-  fetchTrends: async (page = 1) => {
+  fetchTrends: async (page = 1, limit = DEFAULT_TREND_LIMIT) => {
     set({ isLoading: true, error: null });
     try {
       const { filters } = get();
       const params = new URLSearchParams();
       params.set('page', page.toString());
-      params.set('limit', '12');
+      params.set('limit', String(limit));
       params.set('sort', filters.sort);
       if (filters.category !== 'all') params.set('category', filters.category);
       if (filters.phase) params.set('phase', filters.phase);
@@ -60,10 +62,10 @@ export const useTrendStore = create<TrendState>((set, get) => ({
       if (!res.ok) throw new Error(data.error);
       
       set({
-        trends: data.data,
-        total: data.total,
-        page: data.page,
-        totalPages: data.totalPages,
+        trends: data.data ?? [],
+        total: data.total ?? 0,
+        page: data.page ?? page,
+        totalPages: data.totalPages ?? 1,
         isLoading: false,
       });
     } catch (err) {
@@ -73,17 +75,20 @@ export const useTrendStore = create<TrendState>((set, get) => ({
 
   searchTrends: async (query) => {
     if (query.length < 2) {
-      get().fetchTrends();
-      return;
+      await get().fetchTrends();
+      return get().trends;
     }
     set({ isLoading: true, error: null, searchQuery: query });
     try {
       const res = await fetch(`${API_URL}/trends/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      set({ trends: data.data, isLoading: false });
+      const results = data.data ?? [];
+      set({ trends: results, total: results.length, page: 1, totalPages: 1, isLoading: false });
+      return results;
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
+      return [];
     }
   },
 

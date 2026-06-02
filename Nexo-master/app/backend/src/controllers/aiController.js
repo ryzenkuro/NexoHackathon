@@ -6,6 +6,66 @@ import {
   loadDashboardAiContext,
   loadTrendAiContext,
 } from '../services/ai/nexoContext.js';
+import {
+  buildContentStructuredInsight,
+  buildTrendStructuredInsight,
+  contentInsightToText,
+  trendInsightToText,
+} from '../services/ai/insightGenerator.js';
+
+const recommendationCache = new Map();
+const contentAnalysisCache = new Map();
+
+function getRecommendationCacheTtlMs() {
+  const configured = Number(process.env.AI_RECOMMENDATION_CACHE_TTL_MS || 10 * 60 * 1000);
+  return Number.isFinite(configured) && configured >= 0 ? configured : 10 * 60 * 1000;
+}
+
+function getRecommendationMode(value) {
+  return String(value || '').toLowerCase() === 'saturation' ? 'saturation' : 'trend';
+}
+
+function getCachedRecommendation(cacheKey) {
+  const ttlMs = getRecommendationCacheTtlMs();
+  if (ttlMs <= 0) return null;
+
+  const cached = recommendationCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (Date.now() - cached.createdAt > ttlMs) {
+    recommendationCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.payload;
+}
+
+function setCachedRecommendation(cacheKey, payload) {
+  const ttlMs = getRecommendationCacheTtlMs();
+  if (ttlMs <= 0) return;
+  recommendationCache.set(cacheKey, { createdAt: Date.now(), payload });
+}
+
+function getCachedContentAnalysis(cacheKey) {
+  const ttlMs = getRecommendationCacheTtlMs();
+  if (ttlMs <= 0) return null;
+
+  const cached = contentAnalysisCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (Date.now() - cached.createdAt > ttlMs) {
+    contentAnalysisCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.payload;
+}
+
+function setCachedContentAnalysis(cacheKey, payload) {
+  const ttlMs = getRecommendationCacheTtlMs();
+  if (ttlMs <= 0) return;
+  contentAnalysisCache.set(cacheKey, { createdAt: Date.now(), payload });
+}
 
 function sendAiResult(res, result, extra = {}) {
   return res.json({
@@ -42,6 +102,73 @@ function parseJsonObject(text) {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] || raw.match(/\{[\s\S]*\}/)?.[0] || raw;
   return JSON.parse(candidate);
+}
+
+function normalizeRecommendation(payload, mode) {
+  const decision = String(payload.decision || '').trim().slice(0, 50);
+  const summary = String(payload.summary || '').trim().slice(0, 180);
+  
+  const reasons = Array.isArray(payload.reasons)
+    ? payload.reasons.map((r) => String(r || '').trim().slice(0, 120)).filter(Boolean).slice(0, 2)
+    : [];
+  
+  const actions = Array.isArray(payload.actions)
+    ? payload.actions.map((a) => String(a || '').trim().slice(0, 120)).filter(Boolean).slice(0, 2)
+    : [];
+  
+  const risks = Array.isArray(payload.risks)
+    ? payload.risks.map((r) => String(r || '').trim().slice(0, 120)).filter(Boolean).slice(0, 2)
+    : [];
+
+  return {
+    decision: decision || (mode === 'saturation' ? 'Pantau dulu' : 'Aman masuk'),
+    summary: summary || 'Produk ini memerlukan analisis lebih lanjut.',
+    reasons: reasons.length > 0 ? reasons : ['Data terbatas untuk analisis mendalam'],
+    actions: actions.length > 0 ? actions : ['Pantau perkembangan tren'],
+    ...(risks.length > 0 && { risks }),
+    ...(mode === 'saturation' && risks.length === 0 && { risks: ['Risiko perlu evaluasi manual'] }),
+  };
+}
+
+function fallbackRecommendationFromText(text, mode) {
+  const cleaned = String(text || '').trim();
+  
+  const decisionMatch = cleaned.match(/(?:keputusan|decision)\s*:?\s*([^\n.]+)/i);
+  const decision = decisionMatch?.[1]?.trim() || (mode === 'saturation' ? 'Pantau dulu' : 'Aman masuk');
+  
+  const summaryMatch = cleaned.match(/(?:ringkasan|summary)\s*:?\s*([^\n]+)/i);
+  const summary = summaryMatch?.[1]?.trim() || cleaned.split('\n')[0] || 'Produk ini memerlukan analisis lebih lanjut.';
+  
+  const reasonsBlock = cleaned.match(/(?:alasan|reasons?)\s*:?\s*([\s\S]*?)(?=(?:risiko|aksi|actions?|$))/i)?.[1] || '';
+  const reasons = reasonsBlock
+    .split(/\n|[12]\)|[-•]/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.length > 10)
+    .slice(0, 2);
+  
+  const actionsBlock = cleaned.match(/(?:aksi|actions?)\s*(?:24 jam|cepat)?\s*:?\s*([\s\S]*?)$/i)?.[1] || '';
+  const actions = actionsBlock
+    .split(/\n|[12]\)|[-•]/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.length > 5)
+    .slice(0, 2);
+  
+  const risksBlock = mode === 'saturation' 
+    ? cleaned.match(/(?:risiko)\s*(?:utama)?\s*:?\s*([\s\S]*?)(?=(?:aksi|actions?|$))/i)?.[1] || ''
+    : '';
+  const risks = risksBlock
+    .split(/\n|[12]\)|[-•]/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.length > 10)
+    .slice(0, 2);
+
+  return normalizeRecommendation({
+    decision,
+    summary,
+    reasons: reasons.length > 0 ? reasons : undefined,
+    actions: actions.length > 0 ? actions : undefined,
+    risks: risks.length > 0 ? risks : undefined,
+  }, mode);
 }
 
 function normalizeWelcome(payload, trend) {
@@ -105,6 +232,7 @@ export function getAiHealth(_req, res) {
     endpoints: [
       'POST /api/ai/insights/dashboard',
       'GET /api/ai/trends/:id/recommendation',
+      'GET /api/ai/trends/:id/recommendation?mode=saturation',
       'GET /api/ai/content/:id/analysis',
       'GET /api/ai/trends/:id/welcome',
       'POST /api/ai/chat',
@@ -162,14 +290,50 @@ export async function generateTrendRecommendation(req, res) {
   try {
     const { trend, sourceStatus } = await loadTrendAiContext(req.params.id);
     if (!trend) return res.status(404).json({ error: 'Trend not found' });
+    const mode = getRecommendationMode(req.query.mode);
+    const promptId = mode === 'saturation' ? 'saturation_recommendation' : 'trend_recommendation';
+    const cacheKey = `${promptId}:${trend.id}`;
+    const cached = getCachedRecommendation(cacheKey);
+    if (cached) {
+      return res.json({ data: { ...cached, cached: true } });
+    }
 
     const result = await completeText({
-      promptId: 'trend_recommendation',
+      promptId,
       variables: { trend },
-      metadata: { feature: 'trend-recommendation', trendId: trend.id },
+      metadata: { feature: mode === 'saturation' ? 'saturation-recommendation' : 'trend-recommendation', trendId: trend.id },
     });
 
-    return sendAiResult(res, result, { trend, sourceStatus });
+    const deterministicStructured = buildTrendStructuredInsight(trend, { mode });
+    let structured = deterministicStructured;
+    try {
+      structured = normalizeRecommendation({
+        ...deterministicStructured,
+        ...parseJsonObject(result.text),
+        decision: deterministicStructured.decision,
+      }, mode);
+    } catch {
+      structured = normalizeRecommendation(deterministicStructured, mode);
+    }
+
+    const payload = {
+      text: trendInsightToText(structured),
+      structured,
+      promptId: result.promptId,
+      provider: result.provider,
+      model: result.model,
+      runId: result.runId,
+      evaluation: result.evaluation,
+      usage: result.usage,
+      finishReason: result.finishReason,
+      fallbackReason: result.fallbackReason,
+      mode,
+      trend,
+      sourceStatus,
+      cached: false,
+    };
+    setCachedRecommendation(cacheKey, payload);
+    return res.json({ data: payload });
   } catch (error) {
     console.error('[ai] trend recommendation error:', error);
     return sendAiError(res, error, 'Failed to generate trend recommendation');
@@ -180,6 +344,11 @@ export async function generateContentAnalysis(req, res) {
   try {
     const { content, trend, sourceStatus } = await loadContentAiContext(req.params.id);
     if (!content) return res.status(404).json({ error: 'Content not found' });
+    const cacheKey = `content_analysis:${content.id}:${trend?.id || 'no-trend'}`;
+    const cached = getCachedContentAnalysis(cacheKey);
+    if (cached) {
+      return res.json({ data: { ...cached, cached: true } });
+    }
 
     const result = await completeText({
       promptId: 'content_analysis',
@@ -187,7 +356,26 @@ export async function generateContentAnalysis(req, res) {
       metadata: { feature: 'content-analysis', contentId: content.id, trendId: trend?.id },
     });
 
-    return sendAiResult(res, result, { content, trend, sourceStatus });
+    const structured = buildContentStructuredInsight(content, trend);
+    const payload = {
+      text: contentInsightToText(structured),
+      structured,
+      promptId: result.promptId,
+      provider: result.provider,
+      model: result.model,
+      runId: result.runId,
+      evaluation: result.evaluation,
+      usage: result.usage,
+      finishReason: result.finishReason,
+      fallbackReason: result.fallbackReason,
+      mode: 'content',
+      content,
+      trend,
+      sourceStatus,
+      cached: false,
+    };
+    setCachedContentAnalysis(cacheKey, payload);
+    return res.json({ data: payload });
   } catch (error) {
     console.error('[ai] content analysis error:', error);
     return sendAiError(res, error, 'Failed to generate content analysis');

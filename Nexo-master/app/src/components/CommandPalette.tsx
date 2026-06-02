@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CommandDialog,
@@ -24,6 +24,7 @@ import {
 import { useTheme } from 'next-themes';
 import { useAuthStore, useTrendStore } from '@/stores';
 import { clearStoredAuth, formatGrowth } from '@/lib/utils';
+import { API_URL } from '@/lib/constants';
 import { toast } from 'sonner';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import type { Trend } from '@/types';
@@ -45,6 +46,40 @@ export default function CommandPalette({ open, onOpenChange, onOpenProduct }: Co
   const { trends, setSelectedTrend } = useTrendStore();
   const { setAuth } = useAuthStore();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [query, setQuery] = useState('');
+  const [remoteTrends, setRemoteTrends] = useState<Trend[]>([]);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      setRemoteTrends([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/trends/search?q=${encodeURIComponent(normalized)}`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Pencarian gagal');
+        setRemoteTrends(json.data ?? []);
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') setRemoteTrends([]);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const trendResults = useMemo(
+    () => (query.trim().length >= 2 ? remoteTrends : trends.slice(0, 8)),
+    [query, remoteTrends, trends]
+  );
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -78,7 +113,11 @@ export default function CommandPalette({ open, onOpenChange, onOpenProduct }: Co
       title="Pencarian cepat"
       description="Cari tren atau berpindah halaman dengan cepat"
     >
-      <CommandInput placeholder="Cari tren atau halaman..." />
+      <CommandInput
+        value={query}
+        onValueChange={setQuery}
+        placeholder="Cari tren atau halaman..."
+      />
       <CommandList>
         <CommandEmpty>Hmm, tidak ketemu. Coba kata kunci lain.</CommandEmpty>
 
@@ -110,11 +149,11 @@ export default function CommandPalette({ open, onOpenChange, onOpenProduct }: Co
           </CommandItem>
         </CommandGroup>
 
-        {trends.length > 0 && (
+        {trendResults.length > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Tren Aktif">
-              {trends.slice(0, 8).map((trend) => (
+              {trendResults.slice(0, 8).map((trend) => (
                 <CommandItem
                   key={trend.id}
                   value={`${trend.name} ${trend.category} ${trend.platform}`}

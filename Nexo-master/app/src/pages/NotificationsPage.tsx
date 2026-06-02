@@ -1,7 +1,6 @@
 import { Bell, Clock, CheckCheck, Radar } from 'lucide-react';
 import { useState } from 'react';
 import { useNotificationStore, useTrendStore } from '@/stores';
-import { mockTrends } from '@/mockData';
 import { onActivateKey } from '@/lib/utils';
 import type { Notification } from '@/types';
 
@@ -11,14 +10,13 @@ interface NotificationsPageProps {
 
 export default function NotificationsPage({ onOpenProduct }: NotificationsPageProps) {
   const { notifications, markAsRead, markAllRead } = useNotificationStore();
-  const { setSelectedTrend } = useTrendStore();
+  const { getTrendById } = useTrendStore();
   const [now] = useState(() => Date.now());
 
-  const handleNotifClick = (notif: Notification) => {
-    markAsRead(notif.id);
-    const fullTrend = mockTrends.find((t) => t.id === notif.trendId);
+  const handleNotifClick = async (notif: Notification) => {
+    await markAsRead(notif.id);
+    const fullTrend = notif.trendId ? await getTrendById(notif.trendId) : null;
     if (fullTrend) {
-      setSelectedTrend(fullTrend);
       onOpenProduct();
     }
   };
@@ -49,10 +47,10 @@ export default function NotificationsPage({ onOpenProduct }: NotificationsPagePr
     return (
       <article
         key={notif.id}
-        onClick={() => handleNotifClick(notif)}
+        onClick={() => void handleNotifClick(notif)}
         role="button"
         tabIndex={0}
-        onKeyDown={onActivateKey(() => handleNotifClick(notif))}
+        onKeyDown={onActivateKey(() => void handleNotifClick(notif))}
         className={`premium-card premium-card-hover rounded-3xl p-4 cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary/15 list-item-enter btn-press ${highlighted ? 'border-primary/30' : 'opacity-75 hover:opacity-100'}`}
         style={{ animationDelay: `${Math.min(index * 0.05, 0.2)}s` }}
       >

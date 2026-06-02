@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Filter, ArrowUpDown, ArrowRight, SearchCheck } from 'lucide-react';
 import { useTrendStore } from '@/stores';
-import { categories, sortOptions } from '@/mockData';
-import { getSaturationStyle, getPhaseColor, onActivateKey, formatGrowth, getGrowthColor } from '@/lib/utils';
+import { CATEGORIES, SORT_OPTIONS } from '@/lib/constants';
+import { getSaturationStyle, getPhaseColor, onActivateKey, formatGrowth, getGrowthColor, hideBrokenImage } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import type { Trend } from '@/types';
 
@@ -21,7 +21,7 @@ function isPhaseFilter(value: string | null): value is PhaseFilter {
 }
 
 function isSortOption(value: string | null): value is string {
-  return Boolean(value && sortOptions.some((opt) => opt.id === value));
+  return Boolean(value && SORT_OPTIONS.some((opt) => opt.id === value));
 }
 
 export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
@@ -100,13 +100,13 @@ export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
           <div>
             <h2 className="text-3xl font-black tracking-tight text-navy-900">Viral Products</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-secondary-gray-500">
-              Produk trending dari TikTok, Shopee, dan Instagram yang siap dianalisis sebelum pasar terlalu ramai.
+              Produk trending dari TikTok, Shopee, Tokopedia, dan Instagram yang siap dianalisis sebelum pasar terlalu ramai.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:min-w-[320px]">
             <div className="rounded-3xl bg-white/70 p-4">
-              <p className="text-2xl font-black text-navy-900">{sortedTrends.length}</p>
-              <p className="text-xs font-medium text-secondary-gray-500">hasil ditemukan</p>
+              <p className="text-2xl font-black text-navy-900">{trends.length}</p>
+              <p className="text-xs font-medium text-secondary-gray-500">produk terkurasi</p>
             </div>
             <div className="rounded-3xl bg-navy-900 p-4 text-white">
               <p className="text-2xl font-black">{trends.filter((t) => t.phase === 'Emerging').length}</p>
@@ -123,7 +123,7 @@ export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
               <Filter size={17} />
             </span>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {categories.map((cat) => (
+              {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => {
@@ -156,7 +156,7 @@ export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
               aria-label="Urutkan produk"
               className="soft-input rounded-2xl px-3 py-2.5 text-sm font-semibold"
             >
-              {sortOptions.map((opt) => (
+              {SORT_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
               ))}
             </select>
@@ -210,7 +210,7 @@ export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
                     src={trend.thumbnail}
                     alt={trend.name}
                     loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/400/300`; }}
+                    onError={hideBrokenImage}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
@@ -291,13 +291,18 @@ export default function ViralProducts({ onOpenProduct }: ViralProductsProps) {
       )}
 
       {sortedTrends.length > PAGE_SIZE && (
-        <Pagination
-          total={sortedTrends.length}
-          pageSize={PAGE_SIZE}
-          page={page}
-          onPageChange={handlePageChange}
-          itemLabel="tren"
-        />
+        <div className="space-y-3">
+          <p className="px-1 text-xs font-semibold text-secondary-gray-500">
+            Menampilkan {sortedTrends.length} dari {trends.length} produk terkurasi.
+          </p>
+          <Pagination
+            total={sortedTrends.length}
+            pageSize={PAGE_SIZE}
+            page={page}
+            onPageChange={handlePageChange}
+            itemLabel="tren dimuat"
+          />
+        </div>
       )}
     </div>
   );

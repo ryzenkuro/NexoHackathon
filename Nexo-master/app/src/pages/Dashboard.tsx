@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore, useDashboardRealtimeStore, useTrendStore } from '@/stores';
-import { getSaturationStyle, getPhaseColor, computeDashboardStats, onActivateKey, formatGrowth, getGrowthColor } from '@/lib/utils';
+import { getSaturationStyle, getPhaseColor, computeDashboardStats, onActivateKey, formatGrowth, getGrowthColor, hideBrokenImage } from '@/lib/utils';
 import StatCard from '@/components/StatCard';
 import type { GlossaryTerm } from '@/lib/glossary';
 import type { DashboardGrowthItem, InsightId, Trend } from '@/types';
@@ -379,7 +379,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
               Halo, {user?.name?.split(' ')[0] ?? 'Seller'}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-secondary-gray-500">
-              Ada <span className="font-bold text-primary">{dashboardStats.emerging} tren baru</span> terdeteksi dalam 24 jam terakhir. Pantau peluang, risiko saturation, dan window masuk dari satu layar.
+              Ada <span className="font-bold text-primary">{dashboardStats.emerging} tren emerging</span> aktif dari snapshot terbaru. Pantau peluang, risiko saturation, dan window masuk dari satu layar.
             </p>
           </div>
 
@@ -427,6 +427,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
               delta={stat.delta}
               deltaSuffix={stat.deltaSuffix}
               onView={stat.onView}
+              subtitle={stat.label === 'Window Terdekat' ? 'Countdown aktif' : 'Snapshot tren 5 menit'}
             />
           </div>
         ))}
@@ -492,7 +493,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h3 className="section-heading">Tren Real-time</h3>
-                <p className="muted-copy">{trends.length} tren aktif dari TikTok, Shopee, dan Instagram</p>
+                <p className="muted-copy">{trends.length} tren aktif dimuat dari TikTok Shop, Shopee, Tokopedia, dan Instagram</p>
               </div>
               <ShoppingBag size={20} className="text-secondary-gray-500" />
             </div>
@@ -528,7 +529,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
                           src={trend.thumbnail}
                           alt={trend.name}
                           loading="lazy"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/400/300`; }}
+                          onError={hideBrokenImage}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
@@ -617,7 +618,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
                   src={featuredTrend.thumbnail}
                   alt={featuredTrend.name}
                   loading="lazy"
-                  onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${featuredTrend.id}/400/300`; }}
+                  onError={hideBrokenImage}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -674,7 +675,7 @@ export default function Dashboard({ onOpenChat, onOpenProduct, onOpenInsight }: 
                     src={trend.thumbnail}
                     alt={trend.name}
                     loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/400/300`; }}
+                    onError={hideBrokenImage}
                     className="h-11 w-11 flex-shrink-0 rounded-2xl object-cover"
                   />
                   <div className="min-w-0 flex-1">

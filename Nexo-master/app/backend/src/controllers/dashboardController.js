@@ -19,7 +19,7 @@ export function getDashboardStreamStatus(_req, res) {
   return res.json({
     data: {
       clients: getDashboardClientCount(),
-      cadenceMs: Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || 1000),
+      cadenceMs: Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || 5 * 60 * 1000),
     },
   });
 }

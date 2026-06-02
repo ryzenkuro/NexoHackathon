@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
+  AlertTriangle,
+  CheckCircle2,
   Clock,
   Eye,
   Heart,
+  Lightbulb,
   MessageCircle,
   MessageSquare,
   Play,
@@ -12,13 +15,13 @@ import {
   X,
 } from 'lucide-react';
 import { API_URL } from '@/lib/constants';
-import { onActivateKey } from '@/lib/utils';
+import { hideBrokenImage, onActivateKey } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { useTrendStore } from '@/stores';
-import type { ContentItem, Trend } from '@/types';
+import type { ContentItem, StructuredContentInsight, Trend } from '@/types';
 
 const platformFilters = ['Semua', 'TikTok', 'Instagram'] as const;
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 6;
 
 interface TrendingContentProps {
   onOpenChat: () => void;
@@ -30,39 +33,132 @@ function getPlatformColor(platform: string): string {
     : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
 }
 
-function getEngagementNumber(engagement: string): number {
-  const parsed = parseFloat(engagement.replace('%', '').replace(',', '.'));
+type ContentAnalysisState = {
+  text?: string;
+  structured?: StructuredContentInsight;
+  isLoading: boolean;
+  error?: string | null;
+};
+
+function InsightList({
+  title,
+  items,
+  icon,
+}: {
+  title: string;
+  items: string[];
+  icon: 'check' | 'risk' | 'number';
+}) {
+  if (!items.length) return null;
+
+  return (
+    <div className="rounded-2xl bg-white/55 p-3">
+      <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">{title}</p>
+      <ul className="space-y-1.5">
+        {items.slice(0, 2).map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+            {icon === 'check' && <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />}
+            {icon === 'risk' && <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />}
+            {icon === 'number' && <span className="mt-0.5 shrink-0 font-black text-primary">{i + 1}.</span>}
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function getEngagementNumber(value: string) {
+  const parsed = Number.parseFloat(value.replace('%', '').replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getContentAnalysis(content: ContentItem) {
+function parseCompactNumber(value: string) {
+  const normalized = String(value || '').trim().toUpperCase().replace(',', '.');
+  const multiplier = normalized.includes('M') ? 1_000_000 : normalized.includes('K') ? 1_000 : 1;
+  const parsed = Number.parseFloat(normalized.replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? Math.round(parsed * multiplier) : 0;
+}
+
+function getInstantContentAnalysis(content: ContentItem): StructuredContentInsight {
   const engagement = getEngagementNumber(content.engagement);
-  const isHighEngagement = engagement >= 10;
-  const platformHook = content.platform === 'TikTok'
-    ? 'Hook 3 detik pertama harus langsung menunjukkan hasil atau transformasi produk.'
-    : 'Visual opening perlu kuat dan rapi karena audiens Instagram lebih cepat menilai estetika.';
+  const decision = content.productRelevance && engagement >= 7
+    ? 'Remix sekarang'
+    : content.productRelevance || engagement >= 5
+      ? 'Uji angle'
+      : 'Referensi gaya';
+  const platformAngle = content.platform === 'TikTok'
+    ? 'Pakai cut cepat dan teks besar supaya tidak mudah di-skip.'
+    : 'Pakai visual rapi dan caption yang memancing komentar varian.';
 
   return {
-    title: isHighEngagement ? 'Momentum kuat untuk ditiru' : 'Layak diuji dengan angle baru',
-    body: content.productRelevance
-      ? `${platformHook} Format konten ini cocok dipakai sebagai referensi demo produk, unboxing, atau before-after singkat.`
-      : `${platformHook} Gunakan sebagai referensi gaya penyampaian, lalu hubungkan ke produk yang lebih relevan untuk jualan.`,
-    action: isHighEngagement
-      ? 'Prioritaskan remix konten dalam 24 jam dan uji 2 variasi caption.'
-      : 'Uji satu versi soft-selling dulu sebelum masuk ke produksi konten penuh.',
+    decision,
+    summary: `${content.title} bisa dipakai sebagai referensi konten jualan karena engagement ${content.engagement} dan sinyal komentar ${content.comments}.`,
+    hooks: [
+      `"Aku kira biasa aja, ternyata format ini bikin orang berhenti scroll."`,
+      `"Lihat hasilnya dulu sebelum ikut stok produk ini."`,
+    ],
+    angles: [
+      'Tampilkan manfaat atau transformasi di 3 detik pertama.',
+      platformAngle,
+    ],
+    actions: [
+      decision === 'Remix sekarang' ? 'Buat 2 versi hook hari ini.' : 'Uji 1 versi soft-selling dulu.',
+      'Tambahkan CTA tanya harga, varian, atau stok di akhir video.',
+    ],
+    risks: [
+      engagement < 5 ? 'Engagement belum cukup kuat untuk push iklan besar.' : 'Engagement bagus, tapi belum tentu semua komentar berniat beli.',
+      'Format viral cepat ditiru, jadi visual produk harus tetap berbeda.',
+    ],
+  };
+}
+
+function getInstantAnalysisState(content: ContentItem): ContentAnalysisState {
+  return {
+    isLoading: false,
+    text: '',
+    structured: getInstantContentAnalysis(content),
+    error: null,
+  };
+}
+
+function mapContentToChatTrend(content: ContentItem): Trend {
+  const engagement = getEngagementNumber(content.engagement);
+  const insight = getInstantContentAnalysis(content);
+
+  return {
+    id: `content:${content.id}`,
+    name: content.title,
+    category: 'konten',
+    growth: Math.max(12, Math.round(engagement * 12)),
+    saturation: content.productRelevance ? 38 : 56,
+    phase: engagement >= 8 ? 'Growing' : 'Emerging',
+    platform: content.platform,
+    timeDetected: 'Baru saja',
+    windowHours: 24,
+    windowSeconds: 24 * 3600,
+    thumbnail: content.thumbnail,
+    competitorCount: content.productRelevance ? 28 : 44,
+    avgPrice: 0,
+    reviewVelocity: parseCompactNumber(content.comments),
+    description: `Konten ${content.platform} dari ${content.creator}: ${content.title}. Views ${content.views}, engagement ${content.engagement}.`,
+    recommendation: insight.actions[0] || insight.summary,
+    updatedAt: content.updatedAt,
+    freshness: 'demo',
   };
 }
 
 function ContentDetailModal({
   content,
+  analysis,
   onClose,
   onAskNexo,
 }: {
   content: ContentItem;
+  analysis: ContentAnalysisState;
   onClose: () => void;
   onAskNexo: () => void;
 }) {
-  const analysis = getContentAnalysis(content);
   const metricCards = [
     { icon: Eye, label: 'Views', value: content.views },
     { icon: BarChart3, label: 'Engagement', value: content.engagement },
@@ -95,7 +191,7 @@ function ContentDetailModal({
               src={content.thumbnail}
               alt={content.title}
               loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${content.id}/400/600`; }}
+              onError={hideBrokenImage}
               className="h-full w-full object-cover"
             />
           )}
@@ -188,10 +284,45 @@ function ContentDetailModal({
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/70 text-primary">
                 <MessageCircle size={16} />
               </span>
-              <span className="text-sm font-black text-primary">{analysis.title}</span>
+              <span className="text-sm font-black text-primary">Analisis Nexo</span>
             </div>
-            <p className="text-sm leading-relaxed text-navy-700">{analysis.body}</p>
-            <p className="mt-3 text-sm font-bold text-navy-900">{analysis.action}</p>
+            {analysis.isLoading ? (
+              <p className="text-sm leading-relaxed text-navy-700">Menyiapkan analisis Nexo...</p>
+            ) : analysis.error ? (
+              <p className="text-sm leading-relaxed text-red-600">{analysis.error}</p>
+            ) : analysis.structured ? (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm leading-relaxed text-navy-700">{analysis.structured.summary}</p>
+                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-primary">
+                    {analysis.structured.decision}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl bg-white/55 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">
+                    <Lightbulb size={13} />
+                    Hook
+                  </p>
+                  <div className="space-y-1.5">
+                    {analysis.structured.hooks.slice(0, 2).map((hook, i) => (
+                      <p key={i} className="text-xs leading-relaxed text-navy-700">{hook}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <InsightList title="Angle Jualan" items={analysis.structured.angles} icon="check" />
+                  <InsightList title="Risiko" items={analysis.structured.risks} icon="risk" />
+                </div>
+
+                <InsightList title="Aksi Konten" items={analysis.structured.actions} icon="number" />
+              </div>
+            ) : (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
+                {analysis.text || 'Analisis belum tersedia untuk konten ini.'}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">
@@ -215,29 +346,8 @@ function ContentDetailModal({
   );
 }
 
-function mapContentToChatTrend(content: ContentItem): Trend {
-  const engagement = getEngagementNumber(content.engagement);
-  return {
-    id: `content:${content.id}`,
-    name: content.title,
-    category: 'konten',
-    growth: Math.round(engagement * 10),
-    saturation: content.productRelevance ? 34 : 55,
-    phase: engagement >= 10 ? 'Growing' : 'Emerging',
-    platform: content.platform,
-    timeDetected: 'Baru saja',
-    windowHours: 24,
-    thumbnail: content.thumbnail,
-    competitorCount: 0,
-    avgPrice: 0,
-    reviewVelocity: Number.parseInt(content.comments.replace(/\D/g, ''), 10) || 0,
-    description: `Konten ${content.platform} dari ${content.creator}: ${content.title}. Views ${content.views}, likes ${content.likes}, engagement ${content.engagement}.`,
-    recommendation: getContentAnalysis(content).action,
-  };
-}
-
 export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
-  const { setSelectedTrend } = useTrendStore();
+  const { getTrendById, setSelectedTrend } = useTrendStore();
   const [activePlatform, setActivePlatform] = useState<string>('Semua');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
@@ -245,6 +355,7 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analysisById, setAnalysisById] = useState<Record<string, ContentAnalysisState>>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -254,7 +365,7 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
       setError(null);
       try {
         const params = new URLSearchParams();
-        params.set('limit', '100');
+        params.set('limit', '70');
         params.set('sort', 'engagement');
         if (activePlatform !== 'Semua') params.set('platform', activePlatform);
 
@@ -313,10 +424,25 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
   };
 
   const handleInspectContent = (content: ContentItem) => {
+    setAnalysisById((current) => current[content.id]
+      ? current
+      : {
+        ...current,
+        [content.id]: getInstantAnalysisState(content),
+      });
     setSelectedContent(content);
   };
 
-  const handleAskNexo = (content: ContentItem) => {
+  const handleAskNexo = async (content: ContentItem) => {
+    if (content.relatedTrendId) {
+      const trend = await getTrendById(content.relatedTrendId);
+      if (trend) {
+        setSelectedContent(null);
+        onOpenChat();
+        return;
+      }
+    }
+
     setSelectedTrend(mapContentToChatTrend(content));
     setSelectedContent(null);
     onOpenChat();
@@ -336,8 +462,9 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
         <div className="flex min-h-full w-full items-start justify-center py-8">
           <ContentDetailModal
             content={selectedContent}
+            analysis={analysisById[selectedContent.id] ?? getInstantAnalysisState(selectedContent)}
             onClose={() => setSelectedContent(null)}
-            onAskNexo={() => handleAskNexo(selectedContent)}
+            onAskNexo={() => void handleAskNexo(selectedContent)}
           />
         </div>
       </div>
@@ -420,7 +547,7 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
                     src={content.thumbnail}
                     alt={content.title}
                     loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${content.id}/400/600`; }}
+                    onError={hideBrokenImage}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />

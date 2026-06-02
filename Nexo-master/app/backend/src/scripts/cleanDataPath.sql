@@ -52,6 +52,13 @@ create table if not exists public.media_assets (
 create index if not exists trends_platform_updated_at_idx
   on public.trends (platform, updated_at desc);
 
+alter table public.trends
+  add column if not exists source_url text,
+  add column if not exists source_title text,
+  add column if not exists raw_payload_url text,
+  add column if not exists evidence text,
+  add column if not exists confidence_score numeric;
+
 create index if not exists trending_contents_platform_related_updated_idx
   on public.trending_contents (platform, related_trend_id, updated_at desc);
 

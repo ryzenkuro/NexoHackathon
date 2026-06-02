@@ -9,7 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { formatGrowth, getPhaseColor, getSaturationStyle } from '@/lib/utils';
+import { formatGrowth, getPhaseColor, getSaturationStyle, hideBrokenImage } from '@/lib/utils';
 import type { InsightId, Trend } from '@/types';
 
 type InsightConfig = {
@@ -54,7 +54,7 @@ const insightConfig: Record<InsightId, InsightConfig> = {
     icon: Activity,
     title: 'Growth suggestions',
     eyebrow: 'Saran eksekusi konten',
-    summary: 'Tren dengan window panjang cocok dijadikan bahan konten pendek, demo, dan variasi angle jualan.',
+    summary: 'Tren dengan window panjang cocok dijadikan bahan konten pendek, uji pakai, dan variasi angle jualan.',
     recommendation: 'Mulai dari hook 3 detik, before-after, atau unboxing singkat untuk menguji respons audience.',
     primaryLabel: 'Buka Konten',
     primaryPath: '/trending-content',
@@ -88,28 +88,6 @@ function getRelatedTrends(insightId: InsightId, trends: Trend[]): Trend[] {
     .sort((a, b) => b.windowHours - a.windowHours || b.growth - a.growth);
 }
 
-function getInsightTrend(insightId: InsightId, config: InsightConfig, relatedTrends: Trend[]): Trend {
-  const reference = relatedTrends[0];
-
-  return {
-    id: `insight:${insightId}`,
-    name: config.title,
-    category: 'insight',
-    growth: reference?.growth ?? 0,
-    saturation: reference?.saturation ?? config.chatSaturation,
-    phase: reference?.phase ?? config.chatPhase,
-    platform: 'Dashboard',
-    timeDetected: 'AI Insights',
-    windowHours: reference?.windowHours ?? 24,
-    thumbnail: reference?.thumbnail ?? '',
-    competitorCount: relatedTrends.length,
-    avgPrice: 0,
-    reviewVelocity: 0,
-    description: `${config.title}: ${config.summary}`,
-    recommendation: config.recommendation,
-  };
-}
-
 function getAverage(values: number[]) {
   if (values.length === 0) return 0;
   return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
@@ -136,7 +114,7 @@ export default function InsightDetailModal({
   const visibleTrends = relatedTrends.slice(0, 3);
   const avgGrowth = getAverage(relatedTrends.map((trend) => trend.growth));
   const avgSaturation = getAverage(relatedTrends.map((trend) => trend.saturation));
-  const insightTrend = getInsightTrend(insightId, config, relatedTrends);
+  const chatTrend = relatedTrends[0];
 
   return (
     <div
@@ -210,7 +188,7 @@ export default function InsightDetailModal({
                       src={trend.thumbnail}
                       alt={trend.name}
                       loading="lazy"
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${trend.id}/120/120`; }}
+                      onError={hideBrokenImage}
                       className="h-12 w-12 shrink-0 rounded-2xl object-cover"
                     />
                     <div className="min-w-0 flex-1">
@@ -251,8 +229,9 @@ export default function InsightDetailModal({
             <ArrowRight size={17} />
           </button>
           <button
-            onClick={() => onAskNexo(insightTrend)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/70 py-3 text-sm font-bold text-navy-700 transition-colors hover:bg-white btn-press"
+            onClick={() => chatTrend && onAskNexo(chatTrend)}
+            disabled={!chatTrend}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/70 py-3 text-sm font-bold text-navy-700 transition-colors hover:bg-white disabled:opacity-50 btn-press"
           >
             <MessageCircle size={17} />
             Tanya Nexo

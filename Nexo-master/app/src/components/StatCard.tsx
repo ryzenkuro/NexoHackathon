@@ -19,6 +19,7 @@ interface StatCardProps {
   deltaSuffix?: string;
   onView?: () => void;
   className?: string;
+  subtitle?: string;
 }
 
 const TONE_CARD: Record<NonNullable<StatCardProps['iconTone']>, string> = {
@@ -51,6 +52,7 @@ export default function StatCard({
   deltaSuffix = '%',
   onView,
   className = '',
+  subtitle = 'Snapshot tren 5 menit',
 }: StatCardProps) {
   const showDelta = typeof delta === 'number';
   const isUp = (delta ?? 0) >= 0;
@@ -73,7 +75,7 @@ export default function StatCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-navy-900">{labelEl}</p>
-            <p className="mt-1 text-xs font-medium text-navy-700">Real-time trend signal</p>
+            <p className="mt-1 text-xs font-medium text-navy-700">{subtitle}</p>
           </div>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm ${TONE_ICON[iconTone]}`}>
             <Icon size={18} strokeWidth={2.3} />

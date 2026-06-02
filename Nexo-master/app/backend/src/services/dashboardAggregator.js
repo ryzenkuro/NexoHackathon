@@ -1,19 +1,46 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { mapTrendRow } from '../controllers/trendController.js';
 
+const DEFAULT_DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedSnapshot = null;
+let cachedSnapshotAt = 0;
+
+function getDashboardCacheTtlMs() {
+  const configured = Number(process.env.DASHBOARD_METRICS_CACHE_TTL_MS || DEFAULT_DASHBOARD_CACHE_TTL_MS);
+  return Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_DASHBOARD_CACHE_TTL_MS;
+}
+
 async function loadTrendRows() {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Supabase is required for dashboard data.');
   }
 
-  const { data, error } = await supabase
-    .from('trends')
-    .select('*')
-    .order('growth', { ascending: false })
-    .limit(100);
+  const [trendResult, totalResult, emergingResult] = await Promise.all([
+    supabase
+      .from('trends')
+      .select('*')
+      .order('growth', { ascending: false })
+      .limit(100),
+    supabase
+      .from('trends')
+      .select('id', { count: 'exact', head: true }),
+    supabase
+      .from('trends')
+      .select('id', { count: 'exact', head: true })
+      .eq('phase', 'Emerging'),
+  ]);
 
+  const { data, error } = trendResult;
   if (error) throw error;
-  return { rows: data ?? [], sourceStatus: 'database' };
+  if (totalResult.error) throw totalResult.error;
+  if (emergingResult.error) throw emergingResult.error;
+
+  return {
+    rows: data ?? [],
+    totalTrends: totalResult.count ?? data?.length ?? 0,
+    emergingTrends: emergingResult.count ?? 0,
+    sourceStatus: 'database',
+  };
 }
 
 function isActiveTrend(trend) {
@@ -69,7 +96,13 @@ function getMomentumScore(trend) {
 }
 
 export async function getDashboardSnapshot() {
-  const { rows, sourceStatus } = await loadTrendRows();
+  const cacheTtlMs = getDashboardCacheTtlMs();
+  const now = Date.now();
+  if (cacheTtlMs > 0 && cachedSnapshot && now - cachedSnapshotAt < cacheTtlMs) {
+    return cachedSnapshot;
+  }
+
+  const { rows, totalTrends, emergingTrends, sourceStatus } = await loadTrendRows();
   const trends = rows.map(mapTrendRow);
   const activeTrends = trends.filter(isActiveTrend);
   const base = activeTrends.length ? activeTrends : trends;
@@ -101,22 +134,27 @@ export async function getDashboardSnapshot() {
       momentumDirection,
     }));
 
-  return {
+  const snapshot = {
     updatedAt: new Date().toISOString(),
-    cadenceMs: Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || 1000),
+    cadenceMs: Number(process.env.DASHBOARD_REALTIME_INTERVAL_MS || cacheTtlMs || 1000),
+    cacheTtlMs,
     sourceStatus,
     metrics: {
-      activeTrends: activeTrends.length,
-      emergingTrends: base.filter((trend) => trend.phase === 'Emerging').length,
+      activeTrends: totalTrends,
+      emergingTrends,
       avgSaturation,
       nearestWindowSeconds: nearest?.windowSeconds ?? 0,
       nearestWindowTrendId: nearest?.id ?? null,
     },
     deltas: calculateDeltas(base),
     growthMomentum: {
-      totalWatched: base.length,
+      totalWatched: totalTrends,
       weeklyDeltaPct: calculateWeeklyDeltaPct(base),
       items: growthItems,
     },
   };
+
+  cachedSnapshot = snapshot;
+  cachedSnapshotAt = now;
+  return snapshot;
 }
