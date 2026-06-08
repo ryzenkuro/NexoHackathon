@@ -1,9 +1,6 @@
-import crypto from 'crypto';
 import { completeText } from '../services/ai/aiGateway.js';
 import { loadTrendAiContext } from '../services/ai/nexoContext.js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
-
-const CHAT_DAILY_LIMIT = 20;
 
 function writeEvent(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
@@ -15,63 +12,6 @@ async function streamTextAsChunks(res, text) {
     await new Promise((resolve) => setTimeout(resolve, 22));
     writeEvent(res, { chunk });
   }
-}
-
-function startOfTodayIso() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now.toISOString();
-}
-
-function toStorageUserId(value) {
-  const raw = String(value || 'anonymous');
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) {
-    return raw;
-  }
-
-  const hex = crypto.createHash('sha256').update(raw).digest('hex');
-  const variant = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    `4${hex.slice(13, 16)}`,
-    `${variant}${hex.slice(17, 20)}`,
-    hex.slice(20, 32),
-  ].join('-');
-}
-
-async function getDailyUserMessageCount(userId) {
-  const { count, error } = await supabase
-    .from('chat_messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('role', 'user')
-    .gte('created_at', startOfTodayIso());
-
-  if (error) throw error;
-  return count ?? 0;
-}
-
-async function ensureChatUser(userId) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (data) return;
-
-  const { error: insertError } = await supabase.from('users').insert({
-    id: userId,
-    phone: `chat-${userId.slice(0, 18)}`,
-    name: 'Nexo Chat User',
-    password_hash: 'chat-session-managed',
-    business_category: 'Umum',
-    verified: true,
-  });
-
-  if (insertError) throw insertError;
 }
 
 async function loadChatHistory({ userId, trendId }) {
@@ -102,11 +42,15 @@ async function saveChatTurn({ userId, trendId, message, answer }) {
 }
 
 export async function streamChat(req, res) {
-  const { message, trendId, userId = 'anonymous' } = req.body;
-  const storageUserId = toStorageUserId(userId);
+  const { message, trendId } = req.body;
+  const userId = req.user?.id;
 
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
   }
 
   if (!isSupabaseConfigured || !supabase) {
@@ -114,19 +58,11 @@ export async function streamChat(req, res) {
   }
 
   try {
-    await ensureChatUser(storageUserId);
-    const userCount = await getDailyUserMessageCount(storageUserId);
-    if (userCount >= CHAT_DAILY_LIMIT) {
-      return res.status(429).json({
-        error: 'Batas 20 chat per hari tercapai. Coba lagi besok.',
-      });
-    }
-
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const history = await loadChatHistory({ userId: storageUserId, trendId });
+    const history = await loadChatHistory({ userId, trendId });
     const { trend } = trendId
       ? await loadTrendAiContext(trendId)
       : { trend: null };
@@ -135,11 +71,11 @@ export async function streamChat(req, res) {
       promptId: 'chat',
       variables: { message, trend },
       history,
-      metadata: { feature: 'chat-stream', trendId, userId, storageUserId },
+      metadata: { feature: 'chat-stream', trendId, userId },
     });
 
     await streamTextAsChunks(res, result.text);
-    await saveChatTurn({ userId: storageUserId, trendId, message, answer: result.text });
+    await saveChatTurn({ userId, trendId, message, answer: result.text });
 
     res.write('data: [DONE]\n\n');
     res.end();

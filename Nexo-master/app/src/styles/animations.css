@@ -105,6 +105,29 @@
   transform: scale(0.98);
 }
 
+/* Sidebar active icon */
+@keyframes sidebarIconPop {
+  0% {
+    transform: scale(0.85);
+  }
+  65% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.sidebar-icon-active {
+  animation: sidebarIconPop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-icon-active {
+    animation: none;
+  }
+}
+
 /* ─── Shimmer / Skeleton ───────────────────────────────────────────────────── */
 @keyframes shimmer {
   0% {
@@ -123,6 +146,202 @@
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Nexo Data Runner: a branded nod to rainbow runner loaders. */
+@keyframes nexoDataRun {
+  0% {
+    left: -7rem;
+    transform: translateY(-50%) translateY(1px);
+  }
+  25% {
+    transform: translateY(-50%) translateY(-3px);
+  }
+  50% {
+    transform: translateY(-50%) translateY(1px);
+  }
+  75% {
+    transform: translateY(-50%) translateY(-2px);
+  }
+  100% {
+    left: calc(100% + 1rem);
+    transform: translateY(-50%) translateY(1px);
+  }
+}
+
+@keyframes nexoDataGrid {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 24px 0;
+  }
+}
+
+@keyframes nexoDataSpark {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.nexo-data-track {
+  --nexo-blue-deep: #205080;
+  --nexo-blue-dark: #206090;
+  --nexo-blue-medium: #2070a0;
+  --nexo-blue-light: #70b0e0;
+  --nexo-blue-sky: #80c0f0;
+  position: relative;
+  display: block;
+  height: 2.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(32, 112, 160, 0.24);
+  border-radius: 0.875rem;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.82), rgba(237, 248, 255, 0.94)),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgba(32, 112, 160, 0.1) 23px 24px);
+  animation: nexoDataGrid 900ms linear infinite;
+}
+
+.nexo-data-track-compact {
+  height: 1.9rem;
+  border-radius: 0.75rem;
+}
+
+.nexo-data-track-compact .nexo-data-trail {
+  width: 3.75rem;
+  height: 0.8rem;
+}
+
+.nexo-data-track-compact .nexo-data-runner-logo {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 0.55rem;
+}
+
+.nexo-data-track-compact .nexo-data-runner-logo img {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.nexo-data-runner {
+  position: absolute;
+  top: 50%;
+  left: -7rem;
+  display: flex;
+  align-items: center;
+  animation: nexoDataRun 1.85s linear infinite;
+  will-change: left, transform;
+}
+
+.nexo-data-trail {
+  width: 4.75rem;
+  height: 1.125rem;
+  border-radius: 999px 0 0 999px;
+  background: linear-gradient(
+    to bottom,
+    var(--nexo-blue-sky) 0%,
+    var(--nexo-blue-light) 28%,
+    var(--nexo-blue-medium) 58%,
+    var(--nexo-blue-dark) 78%,
+    var(--nexo-blue-deep) 100%
+  );
+  box-shadow:
+    0 0 12px rgba(112, 176, 224, 0.42),
+    0 0 5px rgba(32, 80, 128, 0.24);
+}
+
+.nexo-data-runner-logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  margin-left: -0.15rem;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 0.7rem;
+  background: white;
+  box-shadow: 0 4px 12px rgba(31, 41, 55, 0.2);
+}
+
+.nexo-data-runner-logo img {
+  width: 1.55rem;
+  height: 1.55rem;
+  object-fit: contain;
+}
+
+.nexo-data-runner-spark {
+  position: absolute;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--nexo-blue-sky);
+  box-shadow: 0 0 8px rgba(128, 192, 240, 0.9);
+  animation: nexoDataSpark 700ms ease-in-out infinite;
+}
+
+.nexo-data-runner-spark-one {
+  right: -0.8rem;
+  top: 0.1rem;
+}
+
+.nexo-data-runner-spark-two {
+  right: -1.25rem;
+  bottom: 0.15rem;
+  background: var(--nexo-blue-medium);
+  box-shadow: 0 0 8px rgba(32, 112, 160, 0.85);
+  animation-delay: 300ms;
+}
+
+@keyframes chatAiEllipsis {
+  0%, 60%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+.chat-ai-ellipsis {
+  display: inline-flex;
+  width: 1.2rem;
+  justify-content: flex-start;
+}
+
+.chat-ai-ellipsis span {
+  display: inline-block;
+  animation: chatAiEllipsis 1.2s ease-in-out infinite;
+}
+
+.chat-ai-ellipsis span:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.chat-ai-ellipsis span:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexo-data-track,
+  .nexo-data-runner,
+  .nexo-data-runner-spark,
+  .chat-ai-ellipsis span {
+    animation: none;
+  }
+
+  .nexo-data-runner {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* ─── Typing Indicator ─────────────────────────────────────────────────────── */
@@ -205,6 +424,21 @@
 }
 .bottom-nav-anim {
   animation: bottomNavUp 300ms ease-out forwards;
+}
+
+.bottom-nav-track {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bottom-nav-arrow-icon {
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-track,
+  .bottom-nav-arrow-icon {
+    transition: none;
+  }
 }
 
 /* ─── Pulse Urgency ────────────────────────────────────────────────────────── */

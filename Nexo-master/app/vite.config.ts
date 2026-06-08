@@ -32,7 +32,9 @@ export default defineConfig({
             '@radix-ui/react-select',
             '@radix-ui/react-scroll-area',
             '@radix-ui/react-slot',
+            '@radix-ui/react-progress',
           ],
+          'motion-vendor': ['motion'],
           'utils-vendor': [
             'zustand',
             'next-themes',

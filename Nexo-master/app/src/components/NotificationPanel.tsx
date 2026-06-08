@@ -129,9 +129,9 @@ export default function NotificationPanel({ onClose, onOpenProduct }: Notificati
           <button
             onClick={onClose}
             aria-label="Tutup panel notifikasi"
-            className="flex h-10 w-10 items-center justify-center rounded-2xl hover:bg-white/75 btn-press"
+            className="notification-close-button flex h-10 w-10 items-center justify-center rounded-2xl text-navy-700 transition-colors hover:bg-white/75 btn-press"
           >
-            <X size={20} />
+            <X size={20} className="notification-close-icon" />
           </button>
         </div>
       </div>

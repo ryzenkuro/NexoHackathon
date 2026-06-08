@@ -14,17 +14,23 @@ import {
   Video,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { API_URL } from '@/lib/constants';
+import { normalizeContentMedia } from '@/lib/media';
 import { hideBrokenImage, onActivateKey } from '@/lib/utils';
+import AiInsightState from '@/components/ai/AiInsightState';
 import Pagination from '@/components/Pagination';
 import { useTrendStore } from '@/stores';
-import type { ContentItem, StructuredContentInsight, Trend } from '@/types';
+import type { AiContentInsightResponse, ContentItem, StructuredContentInsight, Trend } from '@/types';
 
 const platformFilters = ['Semua', 'TikTok', 'Instagram'] as const;
 const PAGE_SIZE = 6;
+const AI_CONTENT_CACHE_TTL_MS = 10 * 60 * 1000;
+const contentAnalysisCache = new Map<string, { data: AiContentInsightResponse; expiresAt: number }>();
 
 interface TrendingContentProps {
   onOpenChat: () => void;
+  onDetailOpenChange?: (open: boolean) => void;
 }
 
 function getPlatformColor(platform: string): string {
@@ -113,13 +119,53 @@ function getInstantContentAnalysis(content: ContentItem): StructuredContentInsig
   };
 }
 
-function getInstantAnalysisState(content: ContentItem): ContentAnalysisState {
+function getLoadingAnalysisState(): ContentAnalysisState {
   return {
-    isLoading: false,
-    text: '',
-    structured: getInstantContentAnalysis(content),
+    isLoading: true,
     error: null,
   };
+}
+
+function getCachedContentAnalysis(contentId: string) {
+  const cached = contentAnalysisCache.get(contentId);
+  if (!cached) return null;
+  if (Date.now() > cached.expiresAt) {
+    contentAnalysisCache.delete(contentId);
+    return null;
+  }
+  return cached.data;
+}
+
+function ContentInsightDetails({ insight }: { insight: StructuredContentInsight }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm leading-relaxed text-navy-700">{insight.summary}</p>
+        <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-primary">
+          {insight.decision}
+        </span>
+      </div>
+
+      <div className="rounded-2xl bg-white/55 p-3">
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">
+          <Lightbulb size={13} />
+          Hook
+        </p>
+        <div className="space-y-1.5">
+          {insight.hooks.slice(0, 2).map((hook, i) => (
+            <p key={i} className="text-xs leading-relaxed text-navy-700">{hook}</p>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <InsightList title="Angle Jualan" items={insight.angles} icon="check" />
+        <InsightList title="Risiko" items={insight.risks} icon="risk" />
+      </div>
+
+      <InsightList title="Aksi Konten" items={insight.actions} icon="number" />
+    </div>
+  );
 }
 
 function mapContentToChatTrend(content: ContentItem): Trend {
@@ -153,11 +199,13 @@ function ContentDetailModal({
   analysis,
   onClose,
   onAskNexo,
+  onRetry,
 }: {
   content: ContentItem;
   analysis: ContentAnalysisState;
   onClose: () => void;
   onAskNexo: () => void;
+  onRetry: () => void;
 }) {
   const metricCards = [
     { icon: Eye, label: 'Views', value: content.views },
@@ -286,43 +334,22 @@ function ContentDetailModal({
               </span>
               <span className="text-sm font-black text-primary">Analisis Nexo</span>
             </div>
-            {analysis.isLoading ? (
-              <p className="text-sm leading-relaxed text-navy-700">Menyiapkan analisis Nexo...</p>
-            ) : analysis.error ? (
-              <p className="text-sm leading-relaxed text-red-600">{analysis.error}</p>
-            ) : analysis.structured ? (
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm leading-relaxed text-navy-700">{analysis.structured.summary}</p>
-                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-primary">
-                    {analysis.structured.decision}
-                  </span>
-                </div>
-
-                <div className="rounded-2xl bg-white/55 p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-secondary-gray-500">
-                    <Lightbulb size={13} />
-                    Hook
-                  </p>
-                  <div className="space-y-1.5">
-                    {analysis.structured.hooks.slice(0, 2).map((hook, i) => (
-                      <p key={i} className="text-xs leading-relaxed text-navy-700">{hook}</p>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <InsightList title="Angle Jualan" items={analysis.structured.angles} icon="check" />
-                  <InsightList title="Risiko" items={analysis.structured.risks} icon="risk" />
-                </div>
-
-                <InsightList title="Aksi Konten" items={analysis.structured.actions} icon="number" />
-              </div>
-            ) : (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
-                {analysis.text || 'Analisis belum tersedia untuk konten ini.'}
-              </p>
-            )}
+            <AiInsightState
+              status={analysis.isLoading ? 'loading' : analysis.error ? 'error' : 'success'}
+              title={null}
+              message="Mengolah data tren konten..."
+              errorMessage={analysis.error || undefined}
+              onRetry={onRetry}
+              fallback={<ContentInsightDetails insight={getInstantContentAnalysis(content)} />}
+            >
+              {analysis.structured ? (
+                <ContentInsightDetails insight={analysis.structured} />
+              ) : (
+                <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
+                  {analysis.text || 'Analisis belum tersedia untuk konten ini.'}
+                </p>
+              )}
+            </AiInsightState>
           </div>
 
           <div className="flex gap-3">
@@ -346,7 +373,7 @@ function ContentDetailModal({
   );
 }
 
-export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
+export default function TrendingContent({ onOpenChat, onDetailOpenChange }: TrendingContentProps) {
   const { getTrendById, setSelectedTrend } = useTrendStore();
   const [activePlatform, setActivePlatform] = useState<string>('Semua');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -356,6 +383,7 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisById, setAnalysisById] = useState<Record<string, ContentAnalysisState>>({});
+  const [analysisRetryAttempt, setAnalysisRetryAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -374,7 +402,7 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Gagal mengambil trending content');
-        setContents(json.data);
+        setContents(((json.data ?? []) as ContentItem[]).map(normalizeContentMedia));
       } catch (fetchError) {
         if ((fetchError as Error).name !== 'AbortError') {
           setError((fetchError as Error).message);
@@ -388,6 +416,76 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
     void loadContents();
     return () => controller.abort();
   }, [activePlatform]);
+
+  useEffect(() => {
+    if (!selectedContent?.id) return undefined;
+    const contentId = selectedContent.id;
+    const cached = getCachedContentAnalysis(contentId);
+
+    if (cached) {
+      setAnalysisById((current) => ({
+        ...current,
+        [contentId]: {
+          isLoading: false,
+          text: cached.text,
+          structured: cached.structured,
+          error: null,
+        },
+      }));
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setAnalysisById((current) => ({
+      ...current,
+      [contentId]: {
+        ...current[contentId],
+        isLoading: true,
+        error: null,
+      },
+    }));
+
+    async function loadContentAnalysis() {
+      try {
+        const res = await fetch(`${API_URL}/ai/content/${encodeURIComponent(contentId)}/analysis`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Gagal membuat analisis konten');
+        const data = json.data as AiContentInsightResponse;
+        if (!data) throw new Error('Analisis konten kosong');
+
+        contentAnalysisCache.set(contentId, {
+          data,
+          expiresAt: Date.now() + AI_CONTENT_CACHE_TTL_MS,
+        });
+        setAnalysisById((current) => ({
+          ...current,
+          [contentId]: {
+            isLoading: false,
+            text: data.text,
+            structured: data.structured,
+            error: null,
+          },
+        }));
+      } catch (fetchError) {
+        if ((fetchError as Error).name === 'AbortError') return;
+        const message = (fetchError as Error).message || 'Gagal membuat analisis konten';
+        setAnalysisById((current) => ({
+          ...current,
+          [contentId]: {
+            ...current[contentId],
+            isLoading: false,
+            error: message,
+          },
+        }));
+        toast.error('Analisis konten Nexo gagal dimuat');
+      }
+    }
+
+    void loadContentAnalysis();
+    return () => controller.abort();
+  }, [analysisRetryAttempt, selectedContent?.id]);
 
   useEffect(() => {
     if (!selectedContent) return;
@@ -411,6 +509,12 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
     };
   }, [selectedContent]);
 
+  useEffect(() => {
+    onDetailOpenChange?.(Boolean(selectedContent));
+
+    return () => onDetailOpenChange?.(false);
+  }, [onDetailOpenChange, selectedContent]);
+
   const filtered: ContentItem[] = contents;
 
   const displayed = useMemo(() => {
@@ -424,12 +528,6 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
   };
 
   const handleInspectContent = (content: ContentItem) => {
-    setAnalysisById((current) => current[content.id]
-      ? current
-      : {
-        ...current,
-        [content.id]: getInstantAnalysisState(content),
-      });
     setSelectedContent(content);
   };
 
@@ -462,9 +560,10 @@ export default function TrendingContent({ onOpenChat }: TrendingContentProps) {
         <div className="flex min-h-full w-full items-start justify-center py-8">
           <ContentDetailModal
             content={selectedContent}
-            analysis={analysisById[selectedContent.id] ?? getInstantAnalysisState(selectedContent)}
+            analysis={analysisById[selectedContent.id] ?? getLoadingAnalysisState()}
             onClose={() => setSelectedContent(null)}
             onAskNexo={() => void handleAskNexo(selectedContent)}
+            onRetry={() => setAnalysisRetryAttempt((attempt) => attempt + 1)}
           />
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { normalizeTrendMedia } from '@/lib/media';
 import type { Trend } from '@/types';
 
 const DEFAULT_TREND_LIMIT = 100;
@@ -62,7 +63,7 @@ export const useTrendStore = create<TrendState>((set, get) => ({
       if (!res.ok) throw new Error(data.error);
       
       set({
-        trends: data.data ?? [],
+        trends: ((data.data ?? []) as Trend[]).map(normalizeTrendMedia),
         total: data.total ?? 0,
         page: data.page ?? page,
         totalPages: data.totalPages ?? 1,
@@ -83,7 +84,7 @@ export const useTrendStore = create<TrendState>((set, get) => ({
       const res = await fetch(`${API_URL}/trends/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      const results = data.data ?? [];
+      const results = ((data.data ?? []) as Trend[]).map(normalizeTrendMedia);
       set({ trends: results, total: results.length, page: 1, totalPages: 1, isLoading: false });
       return results;
     } catch (err) {
@@ -96,15 +97,18 @@ export const useTrendStore = create<TrendState>((set, get) => ({
     try {
       const res = await fetch(`${API_URL}/trends/${id}`);
       const data = await res.json();
-      if (!res.ok) return null;
-      set({ selectedTrend: data.data });
-      return data.data;
+      if (!res.ok || !data.data) return null;
+      const trend = normalizeTrendMedia(data.data as Trend);
+      set({ selectedTrend: trend });
+      return trend;
     } catch {
       return null;
     }
   },
 
-  setSelectedTrend: (trend) => set({ selectedTrend: trend }),
+  setSelectedTrend: (trend) => set({
+    selectedTrend: trend ? normalizeTrendMedia(trend) : null,
+  }),
   setSearchQuery: (q) => set({ searchQuery: q }),
   setFilters: (newFilters) => set((state) => ({
     filters: { ...state.filters, ...newFilters },

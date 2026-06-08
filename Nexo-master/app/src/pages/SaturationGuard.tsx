@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import NumberFlow from '@number-flow/react';
+import { toast } from 'sonner';
 import {
   Activity,
   AlertCircle,
@@ -12,8 +13,10 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { API_URL } from '@/lib/constants';
+import { normalizeTrendMedia } from '@/lib/media';
 import { useTrendStore } from '@/stores';
 import { getSaturationDecision } from '@/lib/utils';
+import AiInsightState, { type AiInsightStatus } from '@/components/ai/AiInsightState';
 import { GlossaryTooltip } from '@/components/GlossaryTooltip';
 import type { SaturationDetail, Trend, AiTrendRecommendationResponse } from '@/types';
 
@@ -129,6 +132,9 @@ export default function SaturationGuard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiRecommendation, setAiRecommendation] = useState<AiTrendRecommendationResponse | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiTrendId, setAiTrendId] = useState<string | null>(null);
+  const [aiRetryAttempt, setAiRetryAttempt] = useState(0);
   const selectedTrend: Trend | SaturationDetail | null =
     apiTrend && (!globalSelected?.id || apiTrend.id === globalSelected.id) ? apiTrend : globalSelected;
 
@@ -145,7 +151,7 @@ export default function SaturationGuard() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Gagal mengambil saturation detail');
         if (!cancelled) {
-          setApiTrend(json.data);
+          setApiTrend(normalizeTrendMedia(json.data as SaturationDetail));
           setLoadError(null);
         }
       } catch (error) {
@@ -167,14 +173,18 @@ export default function SaturationGuard() {
 
     const cached = getCachedAiSaturation(selectedTrendId);
     if (cached) {
+      setAiTrendId(selectedTrendId);
       setAiRecommendation(cached);
+      setAiError(null);
       setIsAiLoading(false);
       return undefined;
     }
 
     let cancelled = false;
     const controller = new AbortController();
+    setAiTrendId(selectedTrendId);
     setAiRecommendation(null);
+    setAiError(null);
     setIsAiLoading(true);
 
     async function loadAiRecommendation() {
@@ -192,7 +202,12 @@ export default function SaturationGuard() {
         });
         if (!cancelled) setAiRecommendation(data);
       } catch (error) {
-        if (!cancelled && (error as Error).name !== 'AbortError') setAiRecommendation(null);
+        if (!cancelled && (error as Error).name !== 'AbortError') {
+          const message = (error as Error).message || 'Gagal membuat rekomendasi AI';
+          setAiRecommendation(null);
+          setAiError(message);
+          toast.error('Rekomendasi Saturation Guard gagal dimuat');
+        }
       } finally {
         if (!cancelled) setIsAiLoading(false);
       }
@@ -203,7 +218,7 @@ export default function SaturationGuard() {
       cancelled = true;
       controller.abort();
     };
-  }, [selectedTrend?.id]);
+  }, [aiRetryAttempt, selectedTrend?.id]);
 
   const opportunityScore = clampScore(
     selectedTrend && 'opportunityScore' in selectedTrend
@@ -321,6 +336,12 @@ export default function SaturationGuard() {
     );
   }
 
+  const aiStatus: AiInsightStatus = aiTrendId !== selectedTrend.id || isAiLoading
+    ? 'loading'
+    : aiError
+      ? 'error'
+      : 'success';
+
   const detailCompetitorDensity = (selectedTrend as SaturationDetail).competitorDensity;
   const competitorData: CompetitorPoint[] = Array.isArray(detailCompetitorDensity)
     ? detailCompetitorDensity
@@ -401,22 +422,22 @@ export default function SaturationGuard() {
                 />
               </svg>
 
-              <div className="pointer-events-none absolute inset-x-0 top-[40%] flex flex-col items-center text-center">
-                <p className="text-xs font-bold uppercase tracking-wide text-secondary-gray-500">
+              <div className="pointer-events-none absolute inset-x-0 top-[42%] flex flex-col items-center text-center sm:top-[40%]">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-secondary-gray-500 sm:text-xs">
                   Opportunity Score
                 </p>
-                <p className="mt-1 text-6xl font-black leading-none tracking-tight text-navy-900 sm:text-7xl">
+                <p className="mt-1 text-5xl font-black leading-none tracking-tight text-navy-900 sm:text-7xl">
                   {gaugeValue}%
                 </p>
-                <p className="mt-3 text-sm font-semibold text-secondary-gray-500">
+                <p className="mt-2 text-xs font-semibold text-secondary-gray-500 sm:mt-3 sm:text-sm">
                   Saturation {selectedTrend.saturation}/100
                 </p>
               </div>
 
-              <div className="absolute bottom-4 left-6 text-sm font-bold text-secondary-gray-400 sm:left-9">
+              <div className="absolute bottom-5 left-8 text-xs font-bold text-secondary-gray-400 sm:bottom-4 sm:left-9 sm:text-sm">
                 0%
               </div>
-              <div className="absolute bottom-4 right-6 text-sm font-bold text-secondary-gray-400 sm:right-9">
+              <div className="absolute bottom-5 right-8 text-xs font-bold text-secondary-gray-400 sm:bottom-4 sm:right-9 sm:text-sm">
                 100%
               </div>
             </div>
@@ -485,87 +506,24 @@ export default function SaturationGuard() {
           </div>
 
           <div className={`mt-5 rounded-3xl border p-5 ${satLabel.bg} ${satLabel.border} fade-in-up ${showRecommendation ? 'opacity-100' : 'opacity-0'}`}>
-            {isAiLoading && !aiRecommendation ? (
-              <div className="flex items-start gap-3">
-                <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 shimmer rounded w-1/3" />
-                  <div className="h-3 shimmer rounded w-full" />
-                  <div className="h-3 shimmer rounded w-5/6" />
-                </div>
-              </div>
-            ) : aiRecommendation?.structured ? (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
-                    <p className="text-sm font-black text-navy-900">Rekomendasi</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-navy-900">
-                    {aiRecommendation.structured.decision}
-                  </span>
-                </div>
-                <p className="text-sm leading-relaxed text-navy-700">
-                  {aiRecommendation.structured.summary}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {aiRecommendation.structured.reasons.length > 0 && (
-                    <div className="rounded-2xl bg-white/55 p-3">
-                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Alasan</p>
-                      <ul className="space-y-1.5">
-                        {aiRecommendation.structured.reasons.slice(0, 2).map((reason, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
-                            <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />
-                            <span>{reason}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {aiRecommendation.structured.risks && aiRecommendation.structured.risks.length > 0 && (
-                    <div className="rounded-2xl bg-white/55 p-3">
-                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko Utama</p>
-                      <ul className="space-y-1.5">
-                        {aiRecommendation.structured.risks.slice(0, 2).map((risk, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
-                            <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />
-                            <span>{risk}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-                {aiRecommendation.structured.actions.length > 0 && (
-                  <div className="rounded-2xl bg-navy-900/5 p-3">
-                    <p className="mb-2 text-xs font-black uppercase tracking-wide text-navy-900">Aksi 24 Jam</p>
-                    <ul className="space-y-1.5">
-                      {aiRecommendation.structured.actions.slice(0, 2).map((action, i) => (
-                        <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
-                          <span className="mt-0.5 shrink-0 font-black text-primary">{i + 1}.</span>
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-start gap-3">
-                <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+            <AiInsightState
+              status={aiStatus}
+              message="Mengolah data tren produk..."
+              errorMessage={aiError || undefined}
+              onRetry={() => setAiRetryAttempt((attempt) => attempt + 1)}
+              fallback={(
                 <div>
-                  <p className="mb-1 text-sm font-black text-navy-900">Rekomendasi</p>
                   <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
-                    {aiRecommendation?.text || selectedTrend.recommendation}
+                    {selectedTrend.recommendation}
                   </p>
-                  {!aiRecommendation && 'reasoning' in selectedTrend && Array.isArray(selectedTrend.reasoning) && (
+                  {'reasoning' in selectedTrend && Array.isArray(selectedTrend.reasoning) && (
                     <div className="mt-3 space-y-1">
                       {selectedTrend.reasoning.map((item) => (
                         <p key={item} className="text-xs leading-relaxed text-navy-700">- {item}</p>
                       ))}
                     </div>
                   )}
-                  {!aiRecommendation && 'riskFactors' in selectedTrend && Array.isArray(selectedTrend.riskFactors) && (
+                  {'riskFactors' in selectedTrend && Array.isArray(selectedTrend.riskFactors) && (
                     <div className="mt-3 rounded-2xl bg-white/55 p-3">
                       <p className="text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko utama</p>
                       <div className="mt-2 space-y-1">
@@ -576,8 +534,76 @@ export default function SaturationGuard() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            >
+              {aiRecommendation?.structured ? (
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+                      <p className="text-sm font-black text-navy-900">Rekomendasi</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-navy-900">
+                      {aiRecommendation.structured.decision}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-navy-700">
+                    {aiRecommendation.structured.summary}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {aiRecommendation.structured.reasons.length > 0 && (
+                      <div className="rounded-2xl bg-white/55 p-3">
+                        <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Alasan</p>
+                        <ul className="space-y-1.5">
+                          {aiRecommendation.structured.reasons.slice(0, 2).map((reason, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                              <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />
+                              <span>{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {aiRecommendation.structured.risks && aiRecommendation.structured.risks.length > 0 && (
+                      <div className="rounded-2xl bg-white/55 p-3">
+                        <p className="mb-2 text-xs font-black uppercase tracking-wide text-secondary-gray-500">Risiko Utama</p>
+                        <ul className="space-y-1.5">
+                          {aiRecommendation.structured.risks.slice(0, 2).map((risk, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />
+                              <span>{risk}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  {aiRecommendation.structured.actions.length > 0 && (
+                    <div className="rounded-2xl bg-navy-900/5 p-3">
+                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-navy-900">Aksi 24 Jam</p>
+                      <ul className="space-y-1.5">
+                        {aiRecommendation.structured.actions.slice(0, 2).map((action, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-navy-700">
+                            <span className="mt-0.5 shrink-0 font-black text-primary">{i + 1}.</span>
+                            <span>{action}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <AlertCircle className={`mt-0.5 flex-shrink-0 ${satLabel.color}`} size={20} />
+                  <div>
+                    <p className="mb-1 text-sm font-black text-navy-900">Rekomendasi</p>
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-navy-700">
+                      {aiRecommendation?.text || selectedTrend.recommendation}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </AiInsightState>
           </div>
         </div>
 

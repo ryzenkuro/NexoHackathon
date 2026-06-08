@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { X, Send, Lock, Trash2, AlertTriangle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Lock, RefreshCw, Send, Trash2, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 import { useChatStore, useTrendStore } from '@/stores';
 import { useAuthStore } from '@/stores';
 import { APP_CONFIG } from '@/lib/constants';
+import ChatAiStatus from '@/components/ai/ChatAiStatus';
 
 interface ChatbotPanelProps {
   onClose: () => void;
@@ -25,20 +27,40 @@ function MessageContent({ text }: { text: string }) {
   );
 }
 
-function WelcomeSkeleton() {
+function ChatErrorBubble({
+  message,
+  retryable,
+  onRetry,
+}: {
+  message: string;
+  retryable: boolean;
+  onRetry?: () => void;
+}) {
   return (
     <div className="flex justify-start fade-in">
-      <div className="max-w-[88%] rounded-3xl rounded-bl-md bg-white/75 px-4 py-3 shadow-sm">
-        <div className="mb-3 h-4 w-40 animate-pulse rounded-full bg-secondary-gray-200" />
-        <div className="space-y-2">
-          <div className="h-3 w-64 animate-pulse rounded-full bg-secondary-gray-100" />
-          <div className="h-3 w-52 animate-pulse rounded-full bg-secondary-gray-100" />
+      <div
+        role="alert"
+        className="max-w-[88%] rounded-3xl rounded-bl-md border border-red-100 bg-red-50 px-4 py-3 shadow-sm"
+      >
+        <div className="flex items-start gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/80 text-red-600">
+            <AlertCircle size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-black text-navy-900">Analisis Nexo belum berhasil</p>
+            <p className="mt-1 text-xs leading-relaxed text-red-600">{message}</p>
+          </div>
         </div>
-        <div className="mt-4 flex items-center gap-1.5">
-          <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-          <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-          <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-        </div>
+        {retryable && onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-white/85 px-3 py-2 text-xs font-black text-navy-900 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <RefreshCw size={13} />
+            Coba lagi
+          </button>
+        )}
       </div>
     </div>
   );
@@ -46,18 +68,20 @@ function WelcomeSkeleton() {
 
 export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
   const { selectedTrend } = useTrendStore();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const {
-    isStreaming,
-    streamError,
     dailyCount,
     welcomes,
     welcomeLoading,
     welcomeErrors,
+    requests,
     addMessage,
     fetchWelcome,
+    retryWelcome,
     streamChat,
+    retryFailedChat,
     clearSession,
+    syncUser,
   } = useChatStore();
 
   const [input, setInput] = useState('');
@@ -71,6 +95,14 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
   const welcome = trend ? welcomes[trend.id] : undefined;
   const isWelcomeLoading = Boolean(trend && welcomeLoading[trend.id]);
   const welcomeError = trend ? welcomeErrors[trend.id] : undefined;
+  const request = trend ? requests[trend.id] : undefined;
+  const isAnalyzing = request?.phase === 'analyzing';
+  const isStreaming = request?.phase === 'streaming';
+  const isChatBusy = isAnalyzing || isStreaming;
+
+  useEffect(() => {
+    syncUser(user?.id ?? null);
+  }, [syncUser, user?.id]);
 
   useEffect(() => {
     if (trend && messages.length === 0) {
@@ -82,7 +114,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isStreaming]);
+  }, [isAnalyzing, isStreaming, messages]);
 
   useEffect(() => {
     const ta = textareaRef.current;
@@ -93,7 +125,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
 
   const handleSend = useCallback((preset?: string) => {
     const text = (preset ?? input).trim();
-    if (!text || isStreaming || !trend) return;
+    if (!text || isChatBusy || !trend) return;
 
     if (!isAuthenticated) {
       addMessage(trend.id, 'assistant', 'Silakan login terlebih dahulu untuk menggunakan fitur chat.');
@@ -101,15 +133,9 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
       return;
     }
 
-    if (dailyCount >= APP_CONFIG.maxChatsPerDay) {
-      addMessage(trend.id, 'assistant', 'Batas 20 chat per hari tercapai. Coba lagi besok ya.');
-      setInput('');
-      return;
-    }
-
     setInput('');
-    streamChat(trend.id, text, trend.name);
-  }, [input, isStreaming, trend, dailyCount, isAuthenticated, addMessage, streamChat]);
+    void streamChat(trend.id, text);
+  }, [input, isChatBusy, trend, isAuthenticated, addMessage, streamChat]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -150,9 +176,10 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
         {messages.length > 0 && (
           <button
             onClick={handleClearChat}
+            disabled={isChatBusy}
             aria-label="Hapus riwayat chat"
             title="Hapus riwayat chat"
-            className="flex h-10 w-10 items-center justify-center rounded-2xl text-secondary-gray-500 transition-colors hover:bg-red-50 hover:text-red-500 btn-press"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl text-secondary-gray-500 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 btn-press"
           >
             <Trash2 size={16} />
           </button>
@@ -163,7 +190,11 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
         <span className="text-xs text-secondary-gray-500">
           Sisa chat hari ini: <strong className={remainingChats <= 5 ? 'text-red-500' : 'text-primary'}>{remainingChats}</strong>/20
         </span>
-        {remainingChats <= 5 && (
+        {remainingChats === 0 ? (
+          <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+            Mode demo
+          </span>
+        ) : remainingChats <= 5 && (
           <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-xs font-bold text-orange-600">
             <AlertTriangle size={12} />
             Hampir habis
@@ -181,16 +212,24 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
               </p>
             </div>
           </div>
-        ) : messages.length === 0 && !isStreaming && (
+        ) : messages.length === 0 && !isChatBusy && (
           <div className="space-y-3">
             {isWelcomeLoading && !welcome ? (
-              <WelcomeSkeleton />
+              <div className="flex justify-start">
+                <ChatAiStatus message="Nexo AI sedang menyiapkan percakapan" />
+              </div>
+            ) : welcomeError && !welcome ? (
+              <ChatErrorBubble
+                message={welcomeError}
+                retryable
+                onRetry={() => void retryWelcome(trend.id)}
+              />
             ) : (
               <div className="flex justify-start fade-in-up">
                 <div className="max-w-[88%] rounded-3xl rounded-bl-md bg-white/75 px-4 py-3 text-sm leading-relaxed text-navy-900 shadow-sm">
                   <p className="font-bold">Halo, selamat datang.</p>
                   <p className="mt-2 text-secondary-gray-600">
-                    {welcome?.subtitle || welcomeError || `Saya sudah membaca data tren ${trend.name}.`}
+                    {welcome?.subtitle || `Saya sudah membaca data tren ${trend.name}.`}
                   </p>
                   <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-secondary-gray-400">
                     Hal yang bisa langsung kamu tanyakan
@@ -210,6 +249,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
                 </div>
               </div>
             )}
+            {welcome && (
             <div className="flex justify-start pl-4 fade-in">
               <div className="flex items-center gap-2 text-secondary-gray-400">
                 <button aria-label="Salin pembuka" className="rounded-lg p-1 hover:bg-white/70">□</button>
@@ -217,12 +257,13 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
                 <button aria-label="Respons kurang membantu" className="rounded-lg p-1 hover:bg-white/70">♢</button>
               </div>
             </div>
+            )}
           </div>
         )}
 
         {messages.map((msg, i) => (
           <div
-            key={i}
+            key={msg.id}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} list-item-enter`}
             style={{ animationDelay: `${i * 0.05}s` }}
           >
@@ -234,28 +275,25 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
               }`}
             >
               <MessageContent text={msg.content} />
+              {msg.status === 'failed' && (
+                <p className="mt-2 text-[11px] font-bold text-red-500">Respons terputus sebelum selesai.</p>
+              )}
             </div>
           </div>
         ))}
 
-        {isStreaming && (
-          <div className="flex justify-start fade-in">
-            <div className="rounded-3xl rounded-bl-md bg-white/75 px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-                <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-                <span className="typing-dot h-2 w-2 rounded-full bg-secondary-gray-400" />
-              </div>
-            </div>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {isAnalyzing && (
+            <ChatAiStatus message="Nexo AI sedang menganalisis" />
+          )}
+        </AnimatePresence>
 
-        {streamError && (
-          <div className="flex justify-center fade-in">
-            <div className="rounded-2xl bg-red-50 px-4 py-2 text-xs font-semibold text-red-600">
-              {streamError}
-            </div>
-          </div>
+        {trend && request?.phase === 'failed' && request.error && (
+          <ChatErrorBubble
+            message={request.error}
+            retryable={request.retryable}
+            onRetry={() => void retryFailedChat(trend.id)}
+          />
         )}
       </div>
 
@@ -266,17 +304,18 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={isChatBusy}
             placeholder={trend ? `Tanya tentang ${trend.name}...` : 'Pilih tren untuk mulai bertanya...'}
             rows={1}
             aria-label="Pesan ke Nexo"
-            className="soft-input scrollbar-hide min-h-[44px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-2xl px-4 py-3 text-sm"
+            className="soft-input scrollbar-hide min-h-[44px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-2xl px-4 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             onClick={() => handleSend()}
-            disabled={!trend || !input.trim() || isStreaming || dailyCount >= APP_CONFIG.maxChatsPerDay}
+            disabled={!trend || !input.trim() || isChatBusy}
             aria-label="Kirim pesan"
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-colors btn-press ${
-              trend && input.trim() && !isStreaming && dailyCount < APP_CONFIG.maxChatsPerDay
+              trend && input.trim() && !isChatBusy
                 ? 'bg-navy-900 text-white hover:bg-primary'
                 : 'bg-secondary-gray-200 text-secondary-gray-500 cursor-not-allowed'
             }`}
@@ -285,7 +324,7 @@ export default function ChatbotPanel({ onClose }: ChatbotPanelProps) {
           </button>
         </div>
         <p className="mt-2 text-center text-xs text-secondary-gray-500">
-          Enter untuk kirim / Shift+Enter untuk baris baru / Maks 20 per hari
+          Enter untuk kirim / Shift+Enter untuk baris baru
         </p>
       </div>
     </div>

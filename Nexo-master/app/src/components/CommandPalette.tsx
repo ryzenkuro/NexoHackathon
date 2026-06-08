@@ -25,6 +25,7 @@ import { useTheme } from 'next-themes';
 import { useAuthStore, useTrendStore } from '@/stores';
 import { clearStoredAuth, formatGrowth } from '@/lib/utils';
 import { API_URL } from '@/lib/constants';
+import { normalizeTrendMedia } from '@/lib/media';
 import { toast } from 'sonner';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import type { Trend } from '@/types';
@@ -64,7 +65,7 @@ export default function CommandPalette({ open, onOpenChange, onOpenProduct }: Co
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Pencarian gagal');
-        setRemoteTrends(json.data ?? []);
+        setRemoteTrends(((json.data ?? []) as Trend[]).map(normalizeTrendMedia));
       } catch (error) {
         if ((error as Error).name !== 'AbortError') setRemoteTrends([]);
       }

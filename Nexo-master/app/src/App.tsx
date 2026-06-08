@@ -67,6 +67,7 @@ function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedInsight, setSelectedInsight] = useState<InsightId | null>(null);
+  const [contentDetailOpen, setContentDetailOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useCommandPaletteHotkey();
 
   // Redirect authenticated user away from /login
@@ -77,6 +78,14 @@ function App() {
   }, [isAuthenticated, location.pathname, navigate]);
 
   const isLoginPage = location.pathname === '/login';
+  const hideMobileChrome =
+    showChatbot || showNotifications || showProductModal || Boolean(selectedInsight) || contentDetailOpen;
+
+  useEffect(() => {
+    if (!location.pathname.startsWith('/trending-content')) {
+      setContentDetailOpen(false);
+    }
+  }, [location.pathname]);
 
   const navigateFromInsight = (path: string) => {
     setSelectedInsight(null);
@@ -114,15 +123,15 @@ function App() {
             <div className="flex min-h-screen fade-in">
               <Sidebar />
 
-              <div className="flex-1 flex flex-col ml-0 md:ml-[276px]">
+              <div className="min-w-0 flex-1 flex flex-col ml-0 md:ml-[276px]">
                 <Navbar
                   onChatToggle={() => setShowChatbot((v) => !v)}
                   onNotifToggle={() => setShowNotifications((v) => !v)}
                   onOpenProduct={() => setShowProductModal(true)}
                 />
 
-                <main className="flex-1 px-4 sm:px-5 md:px-8 pt-28 md:pt-28 pb-24 md:pb-8">
-                  <div className="mx-auto w-full max-w-[1180px]">
+                <main className="min-w-0 flex-1 overflow-x-hidden px-4 sm:px-5 md:px-8 pt-28 md:pt-28 pb-24 md:pb-8">
+                  <div className="mx-auto min-w-0 w-full max-w-[1180px]">
                   <Suspense fallback={<PageSkeleton />}>
                     <Routes>
                       <Route
@@ -147,7 +156,12 @@ function App() {
                       <Route path="/saturation-guard" element={<SaturationGuard />} />
                       <Route
                         path="/trending-content"
-                        element={<TrendingContent onOpenChat={() => setShowChatbot(true)} />}
+                        element={
+                          <TrendingContent
+                            onOpenChat={() => setShowChatbot(true)}
+                            onDetailOpenChange={setContentDetailOpen}
+                          />
+                        }
                       />
                       <Route
                         path="/notifications"
@@ -167,6 +181,7 @@ function App() {
               <BottomNav
                 onOpenChat={() => setShowChatbot(true)}
                 onOpenNotif={() => setShowNotifications(true)}
+                hidden={hideMobileChrome}
               />
 
               {/* Command Palette (Cmd+K / Ctrl+K) */}

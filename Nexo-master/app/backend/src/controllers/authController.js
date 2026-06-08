@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { signToken, verifyJwt } from '../lib/jwt.js';
-import { shouldUseDevAuth } from '../lib/runtime.js';
+import { shouldUseDevAuth, shouldShowDevOtp } from '../lib/runtime.js';
 import {
   devForgotPassword,
   devLoginUser,
@@ -166,13 +166,13 @@ export async function sendOTP(req, res) {
     }
 
     // TODO: Send OTP via WhatsApp API (Fonnte / Twilio)
-    if (process.env.NODE_ENV !== 'production') {
+    if (shouldShowDevOtp()) {
       console.log(`[OTP][register] Phone: ${normalized}, Code: ${otp}`);
     }
 
     return res.json({
       message: 'OTP terkirim',
-      ...(process.env.NODE_ENV !== 'production' && { otp }),
+      ...(shouldShowDevOtp() && { otp }),
     });
   } catch (error) {
     console.error('Send OTP error:', error);
@@ -357,13 +357,13 @@ export async function sendForgotPasswordOTP(req, res) {
     });
 
     // TODO: Send OTP via WhatsApp API
-    if (process.env.NODE_ENV !== 'production') {
+    if (shouldShowDevOtp()) {
       console.log(`[OTP][forgot-password] Phone: ${normalized}, Code: ${otp}`);
     }
 
     return res.json({
       message: 'Jika nomor terdaftar, OTP akan dikirim.',
-      ...(process.env.NODE_ENV !== 'production' && { otp }),
+      ...(shouldShowDevOtp() && { otp }),
     });
   } catch (error) {
     console.error('Forgot password OTP error:', error);

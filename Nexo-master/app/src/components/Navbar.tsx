@@ -5,6 +5,7 @@ import { useAuthStore, useTrendStore } from '@/stores';
 import { useNotificationStore } from '@/stores';
 import { clearStoredAuth, formatGrowth, hideBrokenImage } from '@/lib/utils';
 import { API_URL } from '@/lib/constants';
+import { normalizeTrendMedia } from '@/lib/media';
 import { toast } from 'sonner';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { Trend } from '@/types';
@@ -169,7 +170,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Pencarian gagal');
-        setRemoteResults(json.data ?? []);
+        setRemoteResults(((json.data ?? []) as Trend[]).map(normalizeTrendMedia));
       } catch (error) {
         if ((error as Error).name !== 'AbortError') setRemoteResults([]);
       } finally {
@@ -225,7 +226,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
 
   return (
     <header className="fixed top-4 left-4 right-4 md:left-[292px] md:right-8 z-40 min-h-[74px] rounded-3xl glassmorphism shadow-navbar flex items-center justify-between gap-4 px-4 sm:px-5">
-      <div className="md:hidden ml-11 flex items-center gap-2 min-w-0">
+      <div className="md:hidden flex min-w-0 items-center gap-2">
         <img src={nexoLogo} alt="Nexo Logo" width={32} height={32} className="h-8 w-8 rounded-xl object-cover" />
         <span className="font-black text-navy-900">Nexo</span>
       </div>
@@ -298,13 +299,13 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2 sm:gap-3">
-        <div ref={mobileSearchRef} className="md:hidden">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-3">
+        <div ref={mobileSearchRef} className="shrink-0 md:hidden">
           <button
             type="button"
             onClick={openMobileSearch}
             aria-label={searchContext.placeholder}
-            className="h-11 w-11 icon-button bg-white/55 btn-press"
+            className="h-10 w-10 shrink-0 icon-button bg-white/55 btn-press sm:h-11 sm:w-11"
           >
             <Search size={19} />
           </button>
@@ -379,7 +380,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         <button
           onClick={onChatToggle}
           aria-label="Buka chat Nexo"
-          className="hidden h-11 w-11 icon-button bg-white/55 btn-press sm:inline-flex"
+          className="hidden h-11 w-11 shrink-0 icon-button bg-white/55 btn-press md:inline-flex"
         >
           <MessageCircle size={19} />
         </button>
@@ -387,7 +388,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         <button
           onClick={toggleDark}
           aria-label={isDark ? 'Mode terang' : 'Mode gelap'}
-          className="h-11 w-11 icon-button bg-white/55 btn-press"
+          className="h-10 w-10 shrink-0 icon-button bg-white/55 btn-press sm:h-11 sm:w-11"
         >
           {isDark ? <Sun size={19} className="text-yellow-500" /> : <Moon size={19} className="text-navy-700" />}
         </button>
@@ -395,13 +396,22 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
         <button
           onClick={onNotifToggle}
           aria-label={`Notifikasi${unreadCount > 0 ? `, ${unreadCount} belum dibaca` : ''}`}
-          className="relative h-11 w-11 icon-button bg-white/55 btn-press"
+          className="relative h-10 w-10 shrink-0 icon-button bg-white/55 btn-press sm:h-11 sm:w-11"
         >
           <Bell size={20} className="text-navy-700" />
           <NotifBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
         </button>
 
-        <div className="hidden items-center gap-3 rounded-2xl bg-white/55 py-1.5 pl-3 pr-1.5 sm:flex">
+        <button
+          onClick={() => setShowLogoutConfirm(true)}
+          className="h-10 w-10 shrink-0 icon-button text-red-500 hover:bg-red-50 btn-press md:hidden sm:h-11 sm:w-11"
+          aria-label="Logout"
+          title="Logout"
+        >
+          <LogOut size={18} />
+        </button>
+
+        <div className="hidden items-center gap-3 rounded-2xl bg-white/55 py-1.5 pl-3 pr-1.5 md:flex">
           <div className="text-right">
             <p className="text-sm font-bold leading-tight text-navy-900">{user?.name ?? 'User'}</p>
             <p className="text-xs text-secondary-gray-500">UMKM Seller</p>
@@ -413,7 +423,7 @@ export default function Navbar({ onChatToggle, onNotifToggle, onOpenProduct }: N
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="hidden h-11 w-11 icon-button text-red-500 hover:bg-red-50 btn-press sm:inline-flex"
+          className="hidden h-11 w-11 icon-button text-red-500 hover:bg-red-50 btn-press md:inline-flex"
           title="Logout"
           aria-label="Logout"
         >
